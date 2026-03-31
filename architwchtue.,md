@@ -1,0 +1,15 @@
+ai-worker/
+│
+├── tasks/
+│
+├── worker/
+│   ├── task-loader.ts
+│   ├── spec-generator.ts
+│   ├── coder.ts
+│   ├── test-runner.ts
+│   └── git-manager.ts
+│
+├── repo/
+│   └── your-product-code
+│
+└── run-worker.ts
