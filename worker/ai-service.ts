@@ -90,7 +90,7 @@ export async function callAI(
 
     if (provider === "ollama") {
       const { Ollama } = await import("ollama")
-      const ollama = new Ollama({ host: process.env.OLLAMA_HOST || "http://localhost:11434" })
+      const ollama = new Ollama({ host: process.env.OLLAMA_HOST || "http://localhost:11434" } as any)
       const response = await ollama.generate({
         model,
         prompt: `${systemPrompt}\n\n${prompt}`,
