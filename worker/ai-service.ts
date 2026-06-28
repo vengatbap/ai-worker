@@ -82,7 +82,7 @@ export async function callAI(
 
     if (provider === "gemini") {
       const { GoogleGenerativeAI } = await import("@google/generative-ai")
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
       const generativeModel = genAI.getGenerativeModel({ model })
       const result = await generativeModel.generateContent(prompt)
       return result.response.text()
@@ -101,7 +101,7 @@ export async function callAI(
 
     if (provider === "huggingface") {
       const { HfInference } = await import("@huggingface/inference")
-      const hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
+      const hf = new HfInference(process.env.HUGGINGFACE_API_KEY || "")
       const response = await hf.textGeneration({
         model,
         inputs: prompt,
@@ -169,7 +169,7 @@ export async function callAI(
     if (provider === "cohere") {
       const cohere = await import("cohere-ai")
       const client = cohere.default.init({
-        token: process.env.COHERE_API_KEY
+        token: process.env.COHERE_API_KEY || ""
       })
       const response = await client.generate({
         model: model || "command-light",
