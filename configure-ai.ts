@@ -80,7 +80,7 @@ function showMenu() {
   })
 }
 
-function installProvider(provider) {
+function installProvider(provider: keyof typeof PROVIDERS) {
   const providerInfo = PROVIDERS[provider]
   if (!providerInfo) {
     console.error(`❌ Unknown provider: ${provider}`)
@@ -98,7 +98,7 @@ function installProvider(provider) {
   }
 }
 
-function updateEnv(provider, apiKey = null) {
+function updateEnv(provider: string, apiKey: string | null = null) {
   const envPath = path.resolve(__dirname, ".env.local")
   let envContent = fs.readFileSync(envPath, "utf-8")
 
@@ -109,7 +109,7 @@ function updateEnv(provider, apiKey = null) {
   )
 
   // Update AI_MODEL based on provider
-  const modelMap = {
+  const modelMap: Record<string, string> = {
     openai: "gpt-4o",
     anthropic: "claude-3-sonnet",
     gemini: "gemini-1.5-flash",
