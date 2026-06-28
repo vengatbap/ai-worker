@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { saveTask, updateTaskStatus } from '@/lib/db'
-import { processTask } from '../../../../worker/engine'
+import { Orchestrator } from '../../../../worker/orchestrator'
 
 export async function POST(req: Request) {
   try {
@@ -12,25 +12,26 @@ export async function POST(req: Request) {
 
     const taskId = Date.now().toString()
     
-    // Save initial task state as processing since we launch it immediately
+    // Save initial task state as pending
     const newTask = {
       id: taskId,
       name: taskName || 'SaaS Generation Task',
-      status: 'processing' as const,
+      status: 'pending' as const,
       timestamp: new Date().toLocaleTimeString(),
       description: taskContent
     }
     
     saveTask(newTask)
 
-    // Trigger the task asynchronously in the background.
-    // The promise will resolve after specs, generation, tests, and self-correction.
-    processTask(taskContent, taskName)
+    // Trigger the Orchestrator asynchronously in the background.
+    const orchestrator = new Orchestrator()
+    
+    orchestrator.runProjectWorkflow(taskId, taskName || 'SaaS Task', taskContent)
       .then((result) => {
-        if (result.success) {
-          updateTaskStatus(taskId, 'success', { report: result.report })
+        if (result.status === "success") {
+          updateTaskStatus(taskId, 'success', { report: result.logs.join('\n') })
         } else {
-          updateTaskStatus(taskId, 'failed', { error: result.error })
+          updateTaskStatus(taskId, 'failed', { error: result.logs.join('\n') })
         }
       })
       .catch((err) => {
