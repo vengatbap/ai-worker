@@ -115,7 +115,7 @@ export async function callAI(
 
     if (provider === "replicate") {
       const Replicate = await import("replicate")
-      const output = await Replicate.default.run(
+      const output = await (Replicate.default as any).run(
         model,
         {
           input: {
