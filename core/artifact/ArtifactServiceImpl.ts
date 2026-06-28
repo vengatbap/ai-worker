@@ -1,4 +1,4 @@
-import { ArtifactService, Artifact } from "../interfaces/types"
+import { ArtifactService, Artifact, ArtifactStatus, ArtifactMetadata } from "../interfaces/types"
 import fs from "fs"
 import path from "path"
 
@@ -38,16 +38,15 @@ export class ArtifactServiceImpl implements ArtifactService {
     projectId: string,
     name: string,
     content: string,
-    metadata: Record<string, any> = {}
+    metadata: ArtifactMetadata
   ): Promise<Artifact> {
     const registry = this.getRegistry(projectId)
     const history = registry[name] || []
-    const nextVersion = history.length + 1
 
     const newArtifact: Artifact = {
-      id: `${name}-v${nextVersion}`,
+      id: `${name}-v${metadata.version}`,
       name,
-      version: nextVersion,
+      version: metadata.version,
       content,
       timestamp: new Date().toISOString(),
       metadata
@@ -59,8 +58,8 @@ export class ArtifactServiceImpl implements ArtifactService {
 
     // Save individual version file as backup
     const dir = this.getArtifactsDir(projectId)
-    const versionFile = path.join(dir, `${name.replace(/[^a-zA-Z0-9]/g, "_")}_v${nextVersion}.md`)
-    fs.writeFileSync(versionFile, content)
+    const versionFile = path.join(dir, `${name.replace(/[^a-zA-Z0-9]/g, "_")}_v${metadata.version}.json`)
+    fs.writeFileSync(versionFile, JSON.stringify(newArtifact, null, 2))
 
     return newArtifact
   }
@@ -88,5 +87,24 @@ export class ArtifactServiceImpl implements ArtifactService {
       }
     }
     return list
+  }
+
+  async updateArtifactStatus(projectId: string, name: string, version: number, status: ArtifactStatus): Promise<void> {
+    const registry = this.getRegistry(projectId)
+    const history = registry[name]
+    if (!history) return
+
+    const artifact = history.find(a => a.version === version)
+    if (artifact) {
+      artifact.metadata.status = status
+      this.saveRegistry(projectId, registry)
+
+      // Also rewrite the individual file copy
+      const dir = this.getArtifactsDir(projectId)
+      const versionFile = path.join(dir, `${name.replace(/[^a-zA-Z0-9]/g, "_")}_v${version}.json`)
+      if (fs.existsSync(versionFile)) {
+        fs.writeFileSync(versionFile, JSON.stringify(artifact, null, 2))
+      }
+    }
   }
 }

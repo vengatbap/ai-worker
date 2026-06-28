@@ -24,7 +24,12 @@ import { EvaluationServiceImpl } from "../core/evaluation/EvaluationServiceImpl"
 import { EventBusImpl } from "../core/events/EventBusImpl"
 import { LearningServiceImpl } from "../core/learning/LearningServiceImpl"
 
+import { ResearchAgent } from "./agents/ResearchAgent"
+import { PlannerAgent } from "./agents/PlannerAgent"
+
 import { updateTaskStatus } from "../src/lib/db"
+import fs from "fs"
+import path from "path"
 
 export class Orchestrator {
   private workspaceService: WorkspaceService
@@ -71,131 +76,182 @@ export class Orchestrator {
     }
 
     const startTime = Date.now()
-    context.logger("Starting v4 Project Orchestrator Engine...")
+    context.logger("Starting SaaS Builder AI v4 Orchestrator Pipeline...")
     this.publishEvent("workflow_started", { projectId, taskName, prompt })
 
     try {
-      // 1. PLANNING PHASE
-      context.logger("Initiating Planning Phase...")
-      updateTaskStatus(projectId, "processing", { report: "Running Planner..." })
-      
-      const plannerConfig = this.modelRouter.route("Planner")
-      const planPrompt = `Create a structured product scope checklist for: ${prompt}`
-      
-      const planContent = await this.providerService.callAI(
-        planPrompt,
-        plannerConfig.provider,
-        plannerConfig.model,
-        "You are a Planner AI. Write clear, instruction-tuning ready specs."
-      )
-      
-      const planArtifact = await this.artifactService.saveArtifact(projectId, "product-plan", planContent)
-      this.publishEvent("artifact_created", { projectId, name: "product-plan", content: planContent })
-
-      // Evaluate Plan
-      context.logger("Evaluating Plan Artifact Quality Gates...")
-      const planEval = await this.evaluationService.evaluateArtifact(planArtifact, "Contains core requirements, target user modules list, and milestones.")
-      this.publishEvent("artifact_evaluated", { projectId, name: "product-plan", passed: planEval.passed })
-
-      if (!planEval.passed) {
-        context.logger(`Planner validation failed: ${planEval.feedback}`, "warn")
+      const agentRequest: AgentRequest = {
+        id: `req-${projectId}`,
+        projectId,
+        workspaceId,
+        taskId: projectId,
+        goal: prompt,
+        context
       }
 
-      // 2. ARCHITECTURE DESIGN PHASE
-      context.logger("Initiating Architecture Phase...")
-      updateTaskStatus(projectId, "processing", { report: "Running Architect..." })
-      
-      const archConfig = this.modelRouter.route("Architect")
-      const archPrompt = `Design folder directory tree structures and Drizzle schema contracts based on Plan:\n${planContent}`
-      
-      const archContent = await this.providerService.callAI(
-        archPrompt,
-        archConfig.provider,
-        archConfig.model,
-        "You are a SaaS Architect AI. Output schemas and structure directories."
-      )
+      // ==========================================
+      // 1. RESEARCH PHASE
+      // ==========================================
+      context.logger("Executing Research Agent...")
+      updateTaskStatus(projectId, "processing", { report: "Executing Research Agent..." })
 
-      const archArtifact = await this.artifactService.saveArtifact(projectId, "architecture", archContent)
-      this.publishEvent("artifact_created", { projectId, name: "architecture", content: archContent })
+      const researchAgent = new ResearchAgent()
+      let researchResponse: AgentResponse | null = null
+      let researchRetries = 0
+      const maxRetries = 3
 
-      // Evaluate Architecture
-      const archEval = await this.evaluationService.evaluateArtifact(archArtifact, "Directory structure conforms to Next.js project directory standards.")
-      this.publishEvent("artifact_evaluated", { projectId, name: "architecture", passed: archEval.passed })
+      while (researchRetries < maxRetries) {
+        researchResponse = await researchAgent.execute(agentRequest)
+        this.publishEvent("agent_executed", { agent: "Research", status: researchResponse.status, retryCount: researchRetries })
 
-      // 3. TASK BACKLOG GENERATION PHASE
-      context.logger("Initiating Task Backlog Generation...")
-      updateTaskStatus(projectId, "processing", { report: "Generating Backlog..." })
-      
-      const taskConfig = this.modelRouter.route("Task")
-      const taskPrompt = `Generate a 5-step detailed JSON backlog list for Developer coding tasks based on Architectures:\n${archContent}`
-      
-      const backlogContent = await this.providerService.callAI(
-        taskPrompt,
-        taskConfig.provider,
-        taskConfig.model,
-        "You are a Task AI. Output valid JSON arrays of feature tickets."
-      )
-      
-      await this.artifactService.saveArtifact(projectId, "tasks", backlogContent)
-      this.publishEvent("artifact_created", { projectId, name: "tasks", content: backlogContent })
+        if (researchResponse.status === "failed") {
+          researchRetries++
+          context.logger(`Research attempt failed: ${researchResponse.logs.join(", ")}. Retrying...`, "warn")
+          continue
+        }
 
-      // 4. DEVELOPMENT & TESTING AUTO-REPAIR LOOP
-      context.logger("Initiating Development & QA Auto-Repair Loop...")
-      updateTaskStatus(projectId, "processing", { report: "Developer Coding..." })
-      
-      const devConfig = this.modelRouter.route("Developer")
-      const devPrompt = `Based on architecture schemas, write utility files helper.ts and tests helper.test.ts inside src/utils. Prompt:\n${prompt}`
-      
-      const codeOutput = await this.providerService.callAI(
-        devPrompt,
-        devConfig.provider,
-        devConfig.model,
-        "You are a Developer AI. Return ONLY JSON containing files list."
-      )
+        // Save raw artifact draft in the Artifact Store
+        const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
+        const researchJsonPath = path.join(datasetDir, "research.json")
+        const researchJsonContent = fs.readFileSync(researchJsonPath, "utf-8")
+        const parsedResearch = JSON.parse(researchJsonContent)
 
-      // Apply changes via Tool manager
-      context.logger("Applying code updates via Tool Service...")
-      // Parse file blocks
-      const jsonMatch = codeOutput.match(/```json\n([\s\S]*?)\n```/)
-      const rawJson = jsonMatch ? jsonMatch[1] : codeOutput
-      const data = JSON.parse(rawJson)
+        // Convert metadata details to Artifact types
+        const draftArtifact = await this.artifactService.saveArtifact(
+          projectId, 
+          "research", 
+          researchJsonContent, 
+          parsedResearch.metadata
+        )
 
-      for (const file of data.files || []) {
-        await this.toolService.executeTool("write_file", { filePath: file.path, content: file.content }, context)
-      }
-      this.publishEvent("code_applied", { projectId, code: codeOutput })
+        // Update artifact status to Evaluating
+        await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Evaluating")
 
-      // Run tests via Tool manager
-      context.logger("Running QA Test Validation...")
-      updateTaskStatus(projectId, "processing", { report: "Running QA Verification..." })
-      
-      const testResult = await this.toolService.executeTool("run_validation", {}, context)
-      this.publishEvent("qa_review_completed", { projectId, passed: testResult.success, errorOutput: testResult.errorOutput })
+        // Run evaluation checks
+        context.logger("Evaluating Research Artifact...")
+        const evalResult = await this.evaluationService.evaluateArtifact(
+          draftArtifact, 
+          "The artifact must contain Executive Summary, Competitors Analysis, and Tech Recommendations. Minimum quality score must be greater than 85."
+        )
 
-      if (!testResult.success) {
-        context.logger("Validation check failed. Initiating self-correction loops...", "warn")
-        // We could run our Developer AI retry path here
+        // Record metrics
+        this.publishEvent("metrics_recorded", {
+          agent: "Research",
+          model: this.modelRouter.route("Research").model,
+          provider: this.modelRouter.route("Research").provider,
+          durationMs: researchResponse.metrics.durationMs,
+          promptTokens: 0,
+          completionTokens: 0,
+          estimatedCost: 0,
+          retryCount: researchRetries,
+          qualityScore: evalResult.score
+        })
+
+        if (evalResult.score < 85) {
+          researchRetries++
+          context.logger(`Research Quality Check failed (Score: ${evalResult.score} < 85): ${evalResult.feedback}. Retrying...`, "warn")
+          await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Rejected")
+          continue
+        }
+
+        // Quality check passed
+        context.logger(`Research Quality Check passed! Score: ${evalResult.score}`)
+        await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Approved")
+        break
       }
 
-      // 5. DEPLOYMENT PHASE
-      context.logger("Executing Deployment Services...")
-      updateTaskStatus(projectId, "processing", { report: "Executing Deployment..." })
-      
-      await this.toolService.executeTool("git_deploy", { commitMessage: `Autonomous builder completed task: ${taskName}` }, context)
-      this.publishEvent("deployment_completed", { projectId })
+      if (!researchResponse || researchResponse.status === "failed" || researchRetries >= maxRetries) {
+        throw new Error("Research Phase failed to meet quality thresholds after maximum retries.")
+      }
 
-      const duration = Date.now() - startTime
-      this.publishEvent("workflow_completed", { projectId, durationMs: duration })
+      // ==========================================
+      // 2. PLANNING PHASE
+      // ==========================================
+      context.logger("Executing Planner Agent...")
+      updateTaskStatus(projectId, "processing", { report: "Executing Planner Agent..." })
+
+      const plannerAgent = new PlannerAgent()
+      let plannerResponse: AgentResponse | null = null
+      let plannerRetries = 0
+
+      while (plannerRetries < maxRetries) {
+        plannerResponse = await plannerAgent.execute(agentRequest)
+        this.publishEvent("agent_executed", { agent: "Planner", status: plannerResponse.status, retryCount: plannerRetries })
+
+        if (plannerResponse.status === "failed") {
+          plannerRetries++
+          context.logger(`Planner attempt failed: ${plannerResponse.logs.join(", ")}. Retrying...`, "warn")
+          continue
+        }
+
+        // Save raw artifact draft in the Artifact Store
+        const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
+        const projectJsonPath = path.join(datasetDir, "project.json")
+        const projectJsonContent = fs.readFileSync(projectJsonPath, "utf-8")
+        const parsedProject = JSON.parse(projectJsonContent)
+
+        const draftArtifact = await this.artifactService.saveArtifact(
+          projectId, 
+          "planner", 
+          projectJsonContent, 
+          parsedProject.metadata
+        )
+
+        // Update status to Evaluating
+        await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Evaluating")
+
+        // Run evaluation checks
+        context.logger("Evaluating Planner Artifact...")
+        const evalResult = await this.evaluationService.evaluateArtifact(
+          draftArtifact, 
+          "The artifact must contain functional requirements list, MVP scope detail, roadmap phases, and milestone definitions. Minimum quality score must be greater than 90."
+        )
+
+        // Record metrics
+        this.publishEvent("metrics_recorded", {
+          agent: "Planner",
+          model: this.modelRouter.route("Planner").model,
+          provider: this.modelRouter.route("Planner").provider,
+          durationMs: plannerResponse.metrics.durationMs,
+          promptTokens: 0,
+          completionTokens: 0,
+          estimatedCost: 0,
+          retryCount: plannerRetries,
+          qualityScore: evalResult.score
+        })
+
+        if (evalResult.score < 90) {
+          plannerRetries++
+          context.logger(`Planner Quality Check failed (Score: ${evalResult.score} < 90): ${evalResult.feedback}. Retrying...`, "warn")
+          await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Rejected")
+          continue
+        }
+
+        // Quality check passed
+        context.logger(`Planner Quality Check passed! Score: ${evalResult.score}`)
+        await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Approved")
+        break
+      }
+
+      if (!plannerResponse || plannerResponse.status === "failed" || plannerRetries >= maxRetries) {
+        throw new Error("Planning Phase failed to meet quality thresholds after maximum retries.")
+      }
+
+      const totalDuration = Date.now() - startTime
+      this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
 
       return {
         status: "success",
-        generatedArtifacts: ["product-plan", "architecture", "tasks"],
-        logs: ["Workflow completed successfully."],
-        metrics: { tokenCount: 0, durationMs: duration }
+        generatedArtifacts: ["research.json", "research.md", "project.json", "product-plan.md"],
+        logs: ["Orchestrator pipeline completed all quality checks successfully!"],
+        metrics: {
+          tokenCount: 0,
+          durationMs: totalDuration
+        }
       }
 
     } catch (err: any) {
-      context.logger(`Workflow run crashed: ${err.message}`, "error")
+      context.logger(`Workflow pipeline crashed: ${err.message}`, "error")
       this.publishEvent("workflow_failed", { projectId, error: err.message })
       throw err
     }

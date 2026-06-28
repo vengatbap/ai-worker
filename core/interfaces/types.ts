@@ -1,3 +1,68 @@
+export type ArtifactStatus = "Draft" | "Evaluating" | "Approved" | "Rejected" | "Archived";
+
+export interface ExecutionMetrics {
+  agent: string;
+  model: string;
+  provider: string;
+  durationMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  estimatedCost: number;
+  retryCount: number;
+  qualityScore: number;
+}
+
+export interface ArtifactMetadata {
+  artifactId: string;
+  version: number;
+  status: ArtifactStatus;
+  createdBy: string;
+  createdAt: string;
+  projectId: string;
+  parentArtifactId: string | null;
+  schemaVersion: string;
+  metrics?: ExecutionMetrics;
+}
+
+export interface ResearchArtifact {
+  metadata: ArtifactMetadata;
+  summary: string;
+  marketOverview: string;
+  competitors: Array<{
+    name: string;
+    strengths: string[];
+    weaknesses: string[];
+  }>;
+  technology: Array<{
+    recommendation: string;
+    confidence: number;
+    evidence: string[];
+  }>;
+  risks: Array<{
+    description: string;
+    impact: "low" | "medium" | "high";
+    mitigation: string;
+  }>;
+  opportunities: string[];
+  references: string[];
+  confidenceScore: number;
+}
+
+export interface PlannerArtifact {
+  metadata: ArtifactMetadata;
+  requirements: string[];
+  scope: string;
+  roadmap: Array<{
+    phaseName: string;
+    tasks: string[];
+  }>;
+  milestones: Array<{
+    name: string;
+    dueDate: string;
+  }>;
+  acceptanceCriteria: string[];
+}
+
 export interface ExecutionContext {
   projectId: string;
   workspaceId: string;
@@ -78,13 +143,14 @@ export interface Artifact {
   version: number;
   content: string;
   timestamp: string;
-  metadata: Record<string, any>;
+  metadata: ArtifactMetadata;
 }
 
 export interface ArtifactService {
-  saveArtifact(projectId: string, name: string, content: string, metadata?: Record<string, any>): Promise<Artifact>;
+  saveArtifact(projectId: string, name: string, content: string, metadata: ArtifactMetadata): Promise<Artifact>;
   getArtifact(projectId: string, name: string, version?: number): Promise<Artifact | null>;
   listArtifacts(projectId: string): Promise<Artifact[]>;
+  updateArtifactStatus(projectId: string, name: string, version: number, status: ArtifactStatus): Promise<void>;
 }
 
 export interface EvaluationService {

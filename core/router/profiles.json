@@ -1,0 +1,56 @@
+{
+  "research": {
+    "preferred": [
+      {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
+      }
+    ],
+    "fallback": [
+      {
+        "provider": "openai",
+        "model": "gpt-4o"
+      }
+    ],
+    "maxTokens": 32000,
+    "temperature": 0.2,
+    "structuredOutput": true,
+    "reasoning": "high"
+  },
+  "planner": {
+    "preferred": [
+      {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
+      }
+    ],
+    "fallback": [
+      {
+        "provider": "openai",
+        "model": "gpt-4o"
+      }
+    ],
+    "maxTokens": 32000,
+    "temperature": 0.2,
+    "structuredOutput": true,
+    "reasoning": "high"
+  },
+  "qa": {
+    "preferred": [
+      {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
+      }
+    ],
+    "fallback": [
+      {
+        "provider": "openai",
+        "model": "gpt-4o"
+      }
+    ],
+    "maxTokens": 16000,
+    "temperature": 0.1,
+    "structuredOutput": true,
+    "reasoning": "medium"
+  }
+}
