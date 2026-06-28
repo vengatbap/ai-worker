@@ -168,7 +168,7 @@ export async function callAI(
 
     if (provider === "cohere") {
       const cohere = await import("cohere-ai")
-      const client = cohere.default.init({
+      const client = ((cohere.default || cohere) as any).init({
         token: process.env.COHERE_API_KEY || ""
       })
       const response = await client.generate({
