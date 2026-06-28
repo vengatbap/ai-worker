@@ -1,4 +1,4 @@
-import { openai } from "./ai"
+import { callAI } from "./ai-service.js"
 
 export async function generateSpec(task: string) {
 
@@ -19,10 +19,9 @@ Task:
 ${task}
 `
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4.1",
-    messages: [{ role: "user", content: prompt }]
-  })
+  const systemPrompt = "You are a software architect. Return ONLY valid JSON."
 
-  return res.choices[0].message.content
+  const result = await callAI(prompt, undefined, undefined, systemPrompt)
+
+  return result
 }
