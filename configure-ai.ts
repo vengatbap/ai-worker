@@ -149,8 +149,9 @@ async function main() {
   }
 
   const provider = args[0].toLowerCase()
+  const providerConfig = (PROVIDERS as Record<string, any>)[provider]
 
-  if (!PROVIDERS[provider]) {
+  if (!providerConfig) {
     console.error(`❌ Unknown provider: ${provider}`)
     console.log("\nAvailable providers:")
     Object.keys(PROVIDERS).forEach(p => console.log(`  - ${p}`))
@@ -159,10 +160,10 @@ async function main() {
 
   const apiKey = args[1] || null
 
-  console.log(`\n🔧 Configuring ${PROVIDERS[provider].name}...`)
+  console.log(`\n🔧 Configuring ${providerConfig.name}...`)
 
   // Install package
-  if (!installProvider(provider)) {
+  if (!installProvider(provider as any)) {
     return
   }
 
@@ -174,8 +175,8 @@ async function main() {
   console.log(`   Provider: ${provider}`)
   console.log(`   Model: ${["openai", "anthropic", "gemini", "groq", "ollama"].includes(provider) ? "Auto-selected" : "N/A"}`)
   
-  if (!apiKey && PROVIDERS[provider].env !== "OLLAMA_HOST") {
-    console.log(`\n⚠️  API Key not provided. Please add your ${PROVIDERS[provider].env} to .env.local`)
+  if (!apiKey && (PROVIDERS as Record<string, any>)[provider].env !== "OLLAMA_HOST") {
+    console.log(`\n⚠️  API Key not provided. Please add your ${(PROVIDERS as Record<string, any>)[provider].env} to .env.local`)
   }
 
   console.log(`\n🚀 Run with: npm run worker\n`)
