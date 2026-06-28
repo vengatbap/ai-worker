@@ -124,7 +124,7 @@ function updateEnv(provider: string, apiKey: string | null = null) {
 
   // Add API key if provided
   if (apiKey) {
-    const providerInfo = PROVIDERS[provider]
+    const providerInfo = (PROVIDERS as Record<string, any>)[provider]
     const envVar = providerInfo.env
     const pattern = new RegExp(`${envVar}=.*`, "i")
     if (pattern.test(envContent)) {
