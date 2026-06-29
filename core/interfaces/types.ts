@@ -1,5 +1,7 @@
 export type ArtifactStatus = "Draft" | "Evaluating" | "Approved" | "Rejected" | "Archived";
 
+export type TaskStatus = "Pending" | "Ready" | "Running" | "Blocked" | "Completed" | "Failed" | "Skipped";
+
 export interface ExecutionMetrics {
   agent: string;
   model: string;
@@ -94,6 +96,79 @@ export interface ArchitectArtifact {
   openapiYaml: string;
   architectureYaml: string;
   adrs: Array<{ title: string; filename: string; decision: string; status: string; context: string }>;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high" | "critical";
+  complexity: "easy" | "medium" | "hard";
+  status: TaskStatus;
+  estimatedHours: number;
+  estimatedTokens: number;
+  dependencies: string[];
+  requiredArtifacts: string[];
+  requiredTools: string[];
+  requiredModels: string[];
+  acceptanceCriteria: string[];
+  outputs: string[];
+  reads: string[];
+  writes: string[];
+  deletes: string[];
+  executionOrder: number;
+  parallelGroup: number;
+  blockingTasks: string[];
+  successors: string[];
+}
+
+export interface ExecutionPackage {
+  taskId: string;
+  title: string;
+  agent: string;
+  reads: string[];
+  writes: string[];
+  deletes: string[];
+  dependencies: string[];
+  tools: string[];
+  modelProfile: string;
+  acceptanceCriteria: string[];
+  context: {
+    architecture: any;
+    workspaceId: string;
+    artifacts: string[];
+    memory: any[];
+    project: {
+      projectId: string;
+      prompt: string;
+    };
+    variables: Record<string, any>;
+    configuration: Record<string, any>;
+  };
+}
+
+export interface PlanningMetrics {
+  estimatedDuration: number;
+  estimatedTokens: number;
+  estimatedCost: number;
+  parallelismScore: number;
+  criticalPathLength: number;
+  totalTasks: number;
+}
+
+export interface ExecutionPlan {
+  epics: Array<{ id: string; name: string; description: string }>;
+  features: Array<{ id: string; epicId: string; name: string; description: string }>;
+  stories: Array<{ id: string; featureId: string; title: string; storyText: string }>;
+  tasks: Task[];
+  criticalPath: string[];
+  risks: Array<{ description: string; impact: string; mitigation: string }>;
+  metrics: PlanningMetrics;
+}
+
+export interface PlanningArtifact {
+  metadata: ArtifactMetadata;
+  plan: ExecutionPlan;
 }
 
 export interface ExecutionContext {

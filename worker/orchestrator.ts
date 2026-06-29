@@ -27,6 +27,7 @@ import { LearningServiceImpl } from "../core/learning/LearningServiceImpl"
 import { ResearchAgent } from "./agents/ResearchAgent"
 import { PlannerAgent } from "./agents/PlannerAgent"
 import { ArchitectAgent } from "./agents/ArchitectAgent"
+import { TaskAgent } from "./agents/TaskAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -295,6 +296,83 @@ export class Orchestrator {
         throw new Error("Architecture Phase failed to meet quality thresholds after maximum retries.")
       }
 
+      // ==========================================
+      // 4. PROJECT PLANNING ENGINE (TASK AI) PHASE
+      // ==========================================
+      context.logger("Executing Project Planning Engine (Task AI) Agent...")
+      updateTaskStatus(projectId, "processing", { report: "Executing Planning Engine..." })
+
+      const taskAgent = new TaskAgent()
+      let taskResponse: AgentResponse | null = null
+      let taskRetries = 0
+
+      while (taskRetries < maxRetries) {
+        taskResponse = await taskAgent.execute(agentRequest)
+        this.publishEvent("agent_executed", { agent: "PlanningEngine", status: taskResponse.status, retryCount: taskRetries })
+
+        if (taskResponse.status === "failed") {
+          taskRetries++
+          context.logger(`Planning Engine attempt failed: ${taskResponse.logs.join(", ")}. Retrying...`, "warn")
+          continue
+        }
+
+        const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
+        const planningJsonPath = path.join(datasetDir, "planning/tasks.json")
+        const planningJsonContent = fs.readFileSync(planningJsonPath, "utf-8")
+
+        // Save raw planning output as metadata version artifact
+        const draftArtifact = await this.artifactService.saveArtifact(
+          projectId, 
+          "planning", 
+          planningJsonContent, 
+          {
+            artifactId: `planning-${projectId}`,
+            version: 1,
+            status: "Draft",
+            createdBy: "PlanningEngine",
+            createdAt: new Date().toISOString(),
+            projectId,
+            parentArtifactId: `architecture-${projectId}`,
+            schemaVersion: "1.0"
+          }
+        )
+
+        await this.artifactService.updateArtifactStatus(projectId, "planning", draftArtifact.version, "Evaluating")
+
+        context.logger("Evaluating Project Backlog Artifact...")
+        const evalResult = await this.evaluationService.evaluateArtifact(
+          draftArtifact, 
+          "The artifact must contain structured epics list, task execution orders, and dependency criteria. Minimum quality score must be greater than 85."
+        )
+
+        this.publishEvent("metrics_recorded", {
+          agent: "PlanningEngine",
+          model: this.modelRouter.route("Planning").model,
+          provider: this.modelRouter.route("Planning").provider,
+          durationMs: taskResponse.metrics.durationMs,
+          promptTokens: 0,
+          completionTokens: 0,
+          estimatedCost: 0,
+          retryCount: taskRetries,
+          qualityScore: evalResult.score
+        })
+
+        if (evalResult.score < 85) {
+          taskRetries++
+          context.logger(`Planning Engine Quality Check failed (Score: ${evalResult.score} < 85): ${evalResult.feedback}. Retrying...`, "warn")
+          await this.artifactService.updateArtifactStatus(projectId, "planning", draftArtifact.version, "Rejected")
+          continue
+        }
+
+        context.logger(`Planning Engine Quality Check passed! Score: ${evalResult.score}`)
+        await this.artifactService.updateArtifactStatus(projectId, "planning", draftArtifact.version, "Approved")
+        break
+      }
+
+      if (!taskResponse || taskResponse.status === "failed" || taskRetries >= maxRetries) {
+        throw new Error("Planning Engine Phase failed to meet quality thresholds after maximum retries.")
+      }
+
       const totalDuration = Date.now() - startTime
       this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
 
@@ -304,8 +382,8 @@ export class Orchestrator {
           "research.json", 
           "project.json", 
           "architecture/architecture.json", 
-          "architecture/database.json", 
-          "architecture/openapi.yaml"
+          "planning/tasks.json",
+          "planning/project-plan.md"
         ],
         logs: ["Orchestrator pipeline completed all quality checks successfully!"],
         metrics: {
