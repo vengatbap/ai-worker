@@ -299,6 +299,35 @@ export interface KnowledgeBase {
   references: string[];
 }
 
+export interface EnvironmentProfile {
+  name: string;
+  envVariables: Record<string, string>;
+  buildCommand: string;
+  healthEndpoint: string;
+  resourceLimits: { cpu: string; memory: string };
+}
+
+export interface DeploymentMetrics {
+  buildTimeMs: number;
+  deploymentTimeMs: number;
+  rollbackTimeMs: number;
+  startupTimeMs: number;
+  imageSizeMb: number;
+  cpuEstimate: string;
+  memoryEstimate: string;
+  healthScore: number;
+}
+
+export interface ReleaseReport {
+  deployment: { status: "success" | "failed"; imageTag: string };
+  verification: { healthCheckPassed: boolean; smokeTestsPassed: boolean };
+  health: { score: number; status: string };
+  rollback: { rollbackVersion: string; rollbackSteps: string[] };
+  metrics: DeploymentMetrics;
+  releaseNotes: string;
+  status: string;
+}
+
 export interface ProjectManifest {
   projectId: string;
   currentStage: "research" | "planning" | "architecture" | "execution" | "quality" | "review" | "documentation" | "deployment";
@@ -335,15 +364,23 @@ export interface ProjectManifest {
     trainingSamplesCount: number;
   };
   deployment?: {
-    status: string;
-    url?: string;
-    environment?: string;
+    currentVersion: string;
+    environment: string;
+    endpoint: string;
+    healthStatus: string;
+    lastDeployment: string;
+    rollbackVersion: string;
   };
 }
 
 export interface DocumentationArtifact {
   metadata: ArtifactMetadata;
   report: DocumentationReport;
+}
+
+export interface DeploymentArtifact {
+  metadata: ArtifactMetadata;
+  report: ReleaseReport;
 }
 
 export interface ExecutionContext {

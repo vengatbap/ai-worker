@@ -35,6 +35,7 @@ import { DeveloperAgent } from "./agents/DeveloperAgent"
 import { QAAgent } from "./agents/QAAgent"
 import { ReviewerAgent } from "./agents/ReviewerAgent"
 import { DocAgent } from "./agents/DocAgent"
+import { DeploymentAgent } from "./agents/DeploymentAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -556,20 +557,41 @@ export class Orchestrator {
       }
 
       const docResponse = await docAgent.execute(docRequest)
-      this.publishEvent("agent_executed", { agent: "Documentation", status: docResponse.status })
-
       if (docResponse.status === "failed") {
         throw new Error(`Documentation AI execution failed: ${docResponse.logs.join(", ")}`)
       }
 
       // ==========================================
-      // 7. COMPILE PROJECT MANIFEST SINGLE SOURCE OF TRUTH
+      // 7. DEPLOYMENT AI (PACKAGING & DELIVERY) PHASE
       // ==========================================
-      context.logger("Compiling unified Project Manifest index...")
+      context.logger("Executing Deployment AI (DeploymentAgent)...")
+      updateTaskStatus(projectId, "processing", { report: "Running Deployment AI..." })
+
+      const deployAgent = new DeploymentAgent()
+      const deployRequest: AgentRequest = {
+        id: `req-${projectId}-deploy`,
+        projectId,
+        workspaceId,
+        taskId: targetTask?.id || projectId,
+        goal: "Generate Docker, Docker Compose, CI/CD, and release metadata.",
+        context
+      }
+
+      const deployResponse = await deployAgent.execute(deployRequest)
+      this.publishEvent("agent_executed", { agent: "Deployment", status: deployResponse.status })
+
+      if (deployResponse.status === "failed") {
+        throw new Error(`Deployment AI execution failed: ${deployResponse.logs.join(", ")}`)
+      }
+
+      // ==========================================
+      // 8. COMPILE PROJECT MANIFEST MASTER KERNEL STATE
+      // ==========================================
+      context.logger("Compiling final Project Manifest Kernel state...")
       
       const manifest: ProjectManifest = {
         projectId,
-        currentStage: "documentation",
+        currentStage: "deployment",
         metadata: {
           projectName: taskName,
           createdAt: new Date(startTime).toISOString(),
@@ -577,8 +599,8 @@ export class Orchestrator {
           version: "1.0.0"
         },
         workflow: {
-          stages: ["research", "planning", "architecture", "execution", "quality", "review", "documentation"],
-          activeStage: "documentation"
+          stages: ["research", "planning", "architecture", "execution", "quality", "review", "documentation", "deployment"],
+          activeStage: "deployment"
         },
         artifacts: {
           research: "research.json",
@@ -587,7 +609,8 @@ export class Orchestrator {
           execution: `planning/execution-packages/${targetTask?.id}/v1.json`,
           quality: "quality/quality-score.json",
           review: "review/review-report.json",
-          documentation: "documentation/docs-report.json"
+          documentation: "documentation/docs-report.json",
+          deployment: "deployment/deployment-report.json"
         },
         versions: {
           research: { current: "v1", history: ["v1"] },
@@ -595,7 +618,8 @@ export class Orchestrator {
           architecture: { current: "v1", history: ["v1"] },
           quality: { current: "v1", history: ["v1"] },
           review: { current: "v1", history: ["v1"] },
-          documentation: { current: "v1", history: ["v1"] }
+          documentation: { current: "v1", history: ["v1"] },
+          deployment: { current: "v1", history: ["v1"] }
         },
         metrics: {
           estimatedCostUsd: 0.5,
@@ -607,16 +631,25 @@ export class Orchestrator {
           { stage: "research", status: "Approved", approvedAt: new Date().toISOString(), approver: "ResearchAI" },
           { stage: "planning", status: "Approved", approvedAt: new Date().toISOString(), approver: "PlannerAI" },
           { stage: "architecture", status: "Approved", approvedAt: new Date().toISOString(), approver: "ArchitectAI" },
-          { stage: "review", status: "Approved", approvedAt: new Date().toISOString(), approver: "ReviewerAI" }
+          { stage: "review", status: "Approved", approvedAt: new Date().toISOString(), approver: "ReviewerAI" },
+          { stage: "deployment", status: "Approved", approvedAt: new Date().toISOString(), approver: "DeploymentAI" }
         ],
         dataset: {
           logsDir: `dataset/${projectId}`,
           trainingSamplesCount: 1
+        },
+        deployment: {
+          currentVersion: "1.0.0",
+          environment: "production",
+          endpoint: "http://localhost:3000",
+          healthStatus: "healthy",
+          lastDeployment: new Date().toISOString(),
+          rollbackVersion: "v0.9.8"
         }
       }
 
       fs.writeFileSync(path.join(datasetDir, "ProjectManifest.json"), JSON.stringify(manifest, null, 2))
-      context.logger("ProjectManifest.json saved successfully.")
+      context.logger("ProjectManifest.json Kernel saved successfully.")
 
       const totalDuration = Date.now() - startTime
       this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
@@ -631,9 +664,10 @@ export class Orchestrator {
           "quality/qa-report.md",
           "review/review-summary.md",
           "documentation/docs-report.json",
+          "deployment/deployment-report.json",
           "ProjectManifest.json"
         ],
-        logs: ["Orchestrator pipeline completed all stages and compiled ProjectManifest index successfully!"],
+        logs: ["Orchestrator pipeline completed all operational stages successfully!"],
         metrics: {
           tokenCount: 0,
           durationMs: totalDuration
