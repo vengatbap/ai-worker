@@ -32,6 +32,7 @@ import { ArchitectAgent } from "./agents/ArchitectAgent"
 import { TaskAgent } from "./agents/TaskAgent"
 import { DeveloperAgent } from "./agents/DeveloperAgent"
 import { QAAgent } from "./agents/QAAgent"
+import { ReviewerAgent } from "./agents/ReviewerAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -378,10 +379,10 @@ export class Orchestrator {
       }
 
       // ==========================================
-      // 5. DEVELOPER AI & QUALITY ASSURANCE ENGINE LOOP
+      // 5. DEVELOPER AI ➡️ QUALITY ASSURANCE ➡️ ENGINEERING GOVERNANCE (REVIEWER AI) LOOP
       // ==========================================
-      context.logger("Beginning Developer AI & QA Engine Execution Loop...")
-      updateTaskStatus(projectId, "processing", { report: "Executing Developer & QA..." })
+      context.logger("Beginning Engineering Governance Execution Loop...")
+      updateTaskStatus(projectId, "processing", { report: "Running Developer, QA, and Reviewer loops..." })
 
       // Fetch the generated tasks list to determine target to execute
       const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
@@ -389,10 +390,10 @@ export class Orchestrator {
       const tasksContent = fs.readFileSync(tasksJsonPath, "utf-8")
       const tasks = JSON.parse(tasksContent) as any[]
 
-      // For Sprint 5 validation slice, we execute the first task in the backlog list
+      // For Sprint 6 validation slice, we execute the first task in the backlog list
       const targetTask = tasks[0]
       if (targetTask) {
-        context.logger(`Selected Task for Developer/QA Execution: ${targetTask.id} - ${targetTask.title}`)
+        context.logger(`Selected Task for Developer/QA/Reviewer Loop: ${targetTask.id} - ${targetTask.title}`)
 
         // 1. Workspace Snapshot System: Backup workspace before making edits
         const workspaceDir = path.join(process.cwd(), "workspace", projectId)
@@ -405,8 +406,9 @@ export class Orchestrator {
 
         const devAgent = new DeveloperAgent()
         const qaAgent = new QAAgent()
+        const reviewerAgent = new ReviewerAgent()
         
-        let qaPassed = false
+        let governancePassed = false
         let devRetries = 0
         const devMaxRetries = 3
         let feedbackLogs = ""
@@ -425,10 +427,11 @@ export class Orchestrator {
           }
         }
 
-        while (devRetries < devMaxRetries && !qaPassed) {
+        while (devRetries < devMaxRetries && !governancePassed) {
           context.logger(`Developer AI Attempt ${devRetries + 1}...`)
           devRequest.context.variables.feedbackLogs = feedbackLogs
 
+          // 1. Run Developer Agent
           const devResponse = await devAgent.execute(devRequest)
 
           if (devResponse.status === "failed") {
@@ -440,8 +443,8 @@ export class Orchestrator {
             continue
           }
 
-          // Trigger Quality Assurance Engine validations and evaluations
-          context.logger("Running QA Engine on generated codebase...")
+          // 2. Trigger Quality Assurance Engine validation
+          context.logger("Running QA Engine validation checks...")
           const qaRequest: AgentRequest = {
             id: `req-${projectId}-qa-${targetTask.id}`,
             projectId,
@@ -457,7 +460,7 @@ export class Orchestrator {
             devRetries++
             feedbackLogs = qaResponse.logs.join(", ")
             errorsList.push(feedbackLogs)
-            context.logger(`QA Engine analysis crashed: ${feedbackLogs}. Retrying...`, "warn")
+            context.logger(`QA Engine validation failed: ${feedbackLogs}. Retrying...`, "warn")
             this.restoreWorkspace(snapshotsDir, workspaceDir)
             continue
           }
@@ -469,18 +472,51 @@ export class Orchestrator {
 
           if (overallScore < 85) {
             devRetries++
-            // Read generated defects to formulate feedback logs
             const defectsReportPath = path.join(datasetDir, "quality/qa-report.md")
-            const defectsFeedback = fs.readFileSync(defectsReportPath, "utf-8")
-            feedbackLogs = `QA failed (Overall Score: ${overallScore} < 85):\n${defectsFeedback}`
+            feedbackLogs = `QA failed (Overall Score: ${overallScore} < 85):\n` + fs.readFileSync(defectsReportPath, "utf-8")
             errorsList.push(feedbackLogs)
-            context.logger(`QA Gate failed: Score is ${overallScore}. Retrying...`, "warn")
+            context.logger(`QA validation gate rejected: Score is ${overallScore}. Retrying...`, "warn")
+            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            continue
+          }
 
-            // Restore snapshot for next clean retry run
+          // 3. Trigger Reviewer Agent (Engineering Governance Gate)
+          context.logger("Triggering Engineering Governance Reviewer...")
+          const reviewerRequest: AgentRequest = {
+            id: `req-${projectId}-reviewer-${targetTask.id}`,
+            projectId,
+            workspaceId,
+            taskId: targetTask.id,
+            goal: "Verify architectural compliance and PR styling standards.",
+            context
+          }
+
+          const reviewResponse = await reviewerAgent.execute(reviewerRequest)
+
+          if (reviewResponse.status === "failed") {
+            devRetries++
+            feedbackLogs = reviewResponse.logs.join(", ")
+            errorsList.push(feedbackLogs)
+            context.logger(`Reviewer AI evaluation failed: ${feedbackLogs}. Retrying...`, "warn")
+            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            continue
+          }
+
+          // Read approval decision status from review output
+          const approvalPath = path.join(datasetDir, "review/approval.json")
+          const approvalContent = fs.readFileSync(approvalPath, "utf-8")
+          const approvalData = JSON.parse(approvalContent)
+
+          if (approvalData.decision !== "APPROVED") {
+            devRetries++
+            const reviewSummaryPath = path.join(datasetDir, "review/review-summary.md")
+            feedbackLogs = `Governance Review rejected (PR Decision: ${approvalData.decision}):\n` + fs.readFileSync(reviewSummaryPath, "utf-8")
+            errorsList.push(feedbackLogs)
+            context.logger(`Reviewer AI requested changes: ${approvalData.decision}. Retrying...`, "warn")
             this.restoreWorkspace(snapshotsDir, workspaceDir)
           } else {
-            context.logger(`QA Gate passed successfully! Score: ${overallScore}`)
-            qaPassed = true
+            context.logger("Engineering Governance Gate APPROVED successfully!")
+            governancePassed = true
           }
         }
 
@@ -488,30 +524,30 @@ export class Orchestrator {
         const report: ExecutionReport = {
           taskId: targetTask.id,
           title: targetTask.title,
-          status: qaPassed ? "success" : "failed",
+          status: governancePassed ? "success" : "failed",
           filesCreated: targetTask.writes,
           filesModified: [],
           retries: devRetries,
           compilerErrors: errorsList,
           buildTimeMs: Date.now() - buildStart,
-          testsPassedCount: qaPassed ? 4 : 0,
-          lintPassed: qaPassed,
-          qualityScore: qaPassed ? 92 : 30
+          testsPassedCount: governancePassed ? 4 : 0,
+          lintPassed: governancePassed,
+          qualityScore: governancePassed ? 92 : 30
         }
 
         const reportPath = path.join(datasetDir, `planning/execution-packages/${targetTask.id}/execution-report.json`)
         fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
         context.logger(`Wrote final execution report: ${reportPath}`)
 
-        // Emit QA metrics to EventBus
-        this.publishEvent("qa_evaluation_completed", {
+        // Passive Dataset Collection emitter
+        this.publishEvent("governance_evaluation_completed", {
           taskId: targetTask.id,
-          passed: qaPassed,
+          passed: governancePassed,
           retries: devRetries
         })
 
-        if (!qaPassed) {
-          throw new Error(`QA Gate failed: Could not achieve quality score >= 85 after ${devMaxRetries} retries.`)
+        if (!governancePassed) {
+          throw new Error(`Governance Reviewer failed to approve the code after ${devMaxRetries} retries.`)
         }
       }
 
@@ -525,9 +561,10 @@ export class Orchestrator {
           "project.json", 
           "architecture/architecture.json", 
           "planning/tasks.json",
-          "quality/qa-report.md"
+          "quality/qa-report.md",
+          "review/review-summary.md"
         ],
-        logs: ["Orchestrator pipeline completed all planning and Quality Assurance checks successfully!"],
+        logs: ["Orchestrator pipeline completed all planning, QA, and Reviewer gates successfully!"],
         metrics: {
           tokenCount: 0,
           durationMs: totalDuration

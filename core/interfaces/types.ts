@@ -238,6 +238,36 @@ export interface QualityArtifact {
   report: QualityReport;
 }
 
+export interface ReviewFinding {
+  id: string;
+  category: "Architecture" | "CodingStandards" | "DesignPattern" | "Security" | "Maintainability";
+  severity: "Low" | "Medium" | "High" | "Critical";
+  file: string;
+  line: number;
+  description: string;
+  recommendation: string;
+  status: "Open" | "Resolved";
+}
+
+export interface ReviewReport {
+  taskId: string;
+  architectureCompliance: { passed: boolean; details: string };
+  codingStandards: { passed: boolean; details: string };
+  designPatterns: { passed: boolean; details: string };
+  maintainability: { passed: boolean; details: string };
+  securityGovernance: { passed: boolean; details: string };
+  technicalDebtHours: number;
+  recommendations: string[];
+  findings: ReviewFinding[];
+  decision: "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+  overallScore: number;
+}
+
+export interface ReviewArtifact {
+  metadata: ArtifactMetadata;
+  report: ReviewReport;
+}
+
 export interface ExecutionContext {
   projectId: string;
   workspaceId: string;
