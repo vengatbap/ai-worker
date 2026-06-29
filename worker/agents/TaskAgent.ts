@@ -157,6 +157,10 @@ export class TaskAgent extends BaseAgent {
           tools: task.requiredTools,
           modelProfile: task.requiredModels[0] || "developer-medium",
           acceptanceCriteria: task.acceptanceCriteria,
+          buildCommand: "npm run build",
+          testCommand: "npm test",
+          lintCommand: "npm run lint",
+          successCriteria: ["Compilation passes", "Tests pass", "Lint clean"],
           context: {
             architecture: parsedArch,
             workspaceId: req.workspaceId,

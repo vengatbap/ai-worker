@@ -133,6 +133,10 @@ export interface ExecutionPackage {
   tools: string[];
   modelProfile: string;
   acceptanceCriteria: string[];
+  buildCommand: string;
+  testCommand: string;
+  lintCommand: string;
+  successCriteria: string[];
   context: {
     architecture: any;
     workspaceId: string;
@@ -169,6 +173,20 @@ export interface ExecutionPlan {
 export interface PlanningArtifact {
   metadata: ArtifactMetadata;
   plan: ExecutionPlan;
+}
+
+export interface ExecutionReport {
+  taskId: string;
+  title: string;
+  status: "success" | "failed";
+  filesCreated: string[];
+  filesModified: string[];
+  retries: number;
+  compilerErrors: string[];
+  buildTimeMs: number;
+  testsPassedCount: number;
+  lintPassed: boolean;
+  qualityScore: number;
 }
 
 export interface ExecutionContext {
