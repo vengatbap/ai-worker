@@ -13,7 +13,8 @@ import {
   AgentResponse,
   AppEvent,
   ExecutionReport,
-  QualityReport
+  QualityReport,
+  ProjectManifest
 } from "../core/interfaces/types"
 
 import { WorkspaceServiceImpl } from "../core/workspace/WorkspaceServiceImpl"
@@ -33,6 +34,7 @@ import { TaskAgent } from "./agents/TaskAgent"
 import { DeveloperAgent } from "./agents/DeveloperAgent"
 import { QAAgent } from "./agents/QAAgent"
 import { ReviewerAgent } from "./agents/ReviewerAgent"
+import { DocAgent } from "./agents/DocAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -379,23 +381,20 @@ export class Orchestrator {
       }
 
       // ==========================================
-      // 5. DEVELOPER AI ➡️ QUALITY ASSURANCE ➡️ ENGINEERING GOVERNANCE (REVIEWER AI) LOOP
+      // 5. DEVELOPER AI ➡️ QUALITY ASSURANCE ➡️ REVIEWER AI LOOP
       // ==========================================
       context.logger("Beginning Engineering Governance Execution Loop...")
       updateTaskStatus(projectId, "processing", { report: "Running Developer, QA, and Reviewer loops..." })
 
-      // Fetch the generated tasks list to determine target to execute
       const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
       const tasksJsonPath = path.join(datasetDir, "planning/tasks.json")
       const tasksContent = fs.readFileSync(tasksJsonPath, "utf-8")
       const tasks = JSON.parse(tasksContent) as any[]
 
-      // For Sprint 6 validation slice, we execute the first task in the backlog list
       const targetTask = tasks[0]
       if (targetTask) {
         context.logger(`Selected Task for Developer/QA/Reviewer Loop: ${targetTask.id} - ${targetTask.title}`)
 
-        // 1. Workspace Snapshot System: Backup workspace before making edits
         const workspaceDir = path.join(process.cwd(), "workspace", projectId)
         const snapshotsDir = path.join(workspaceDir, "snapshots", `before-${targetTask.id}`)
         if (!fs.existsSync(snapshotsDir)) {
@@ -431,7 +430,6 @@ export class Orchestrator {
           context.logger(`Developer AI Attempt ${devRetries + 1}...`)
           devRequest.context.variables.feedbackLogs = feedbackLogs
 
-          // 1. Run Developer Agent
           const devResponse = await devAgent.execute(devRequest)
 
           if (devResponse.status === "failed") {
@@ -443,7 +441,6 @@ export class Orchestrator {
             continue
           }
 
-          // 2. Trigger Quality Assurance Engine validation
           context.logger("Running QA Engine validation checks...")
           const qaRequest: AgentRequest = {
             id: `req-${projectId}-qa-${targetTask.id}`,
@@ -480,7 +477,6 @@ export class Orchestrator {
             continue
           }
 
-          // 3. Trigger Reviewer Agent (Engineering Governance Gate)
           context.logger("Triggering Engineering Governance Reviewer...")
           const reviewerRequest: AgentRequest = {
             id: `req-${projectId}-reviewer-${targetTask.id}`,
@@ -497,12 +493,11 @@ export class Orchestrator {
             devRetries++
             feedbackLogs = reviewResponse.logs.join(", ")
             errorsList.push(feedbackLogs)
-            context.logger(`Reviewer AI evaluation failed: ${feedbackLogs}. Retrying...`, "warn")
+            context.logger(`Reviewer AI evaluation failed: ${reviewResponse.logs.join(", ")}. Retrying...`, "warn")
             this.restoreWorkspace(snapshotsDir, workspaceDir)
             continue
           }
 
-          // Read approval decision status from review output
           const approvalPath = path.join(datasetDir, "review/approval.json")
           const approvalContent = fs.readFileSync(approvalPath, "utf-8")
           const approvalData = JSON.parse(approvalContent)
@@ -539,17 +534,89 @@ export class Orchestrator {
         fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
         context.logger(`Wrote final execution report: ${reportPath}`)
 
-        // Passive Dataset Collection emitter
-        this.publishEvent("governance_evaluation_completed", {
-          taskId: targetTask.id,
-          passed: governancePassed,
-          retries: devRetries
-        })
-
         if (!governancePassed) {
           throw new Error(`Governance Reviewer failed to approve the code after ${devMaxRetries} retries.`)
         }
       }
+
+      // ==========================================
+      // 6. KNOWLEDGE PUBLISHING ENGINE (DOCUMENTATION AI) PHASE
+      // ==========================================
+      context.logger("Executing Documentation AI (DocAgent)...")
+      updateTaskStatus(projectId, "processing", { report: "Running Documentation AI..." })
+
+      const docAgent = new DocAgent()
+      const docRequest: AgentRequest = {
+        id: `req-${projectId}-docs`,
+        projectId,
+        workspaceId,
+        taskId: targetTask?.id || projectId,
+        goal: "Generate all system docs, API specifications, and User guides.",
+        context
+      }
+
+      const docResponse = await docAgent.execute(docRequest)
+      this.publishEvent("agent_executed", { agent: "Documentation", status: docResponse.status })
+
+      if (docResponse.status === "failed") {
+        throw new Error(`Documentation AI execution failed: ${docResponse.logs.join(", ")}`)
+      }
+
+      // ==========================================
+      // 7. COMPILE PROJECT MANIFEST SINGLE SOURCE OF TRUTH
+      // ==========================================
+      context.logger("Compiling unified Project Manifest index...")
+      
+      const manifest: ProjectManifest = {
+        projectId,
+        currentStage: "documentation",
+        metadata: {
+          projectName: taskName,
+          createdAt: new Date(startTime).toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: "1.0.0"
+        },
+        workflow: {
+          stages: ["research", "planning", "architecture", "execution", "quality", "review", "documentation"],
+          activeStage: "documentation"
+        },
+        artifacts: {
+          research: "research.json",
+          planning: "project.json",
+          architecture: "architecture/architecture.json",
+          execution: `planning/execution-packages/${targetTask?.id}/v1.json`,
+          quality: "quality/quality-score.json",
+          review: "review/review-report.json",
+          documentation: "documentation/docs-report.json"
+        },
+        versions: {
+          research: { current: "v1", history: ["v1"] },
+          planning: { current: "v1", history: ["v1"] },
+          architecture: { current: "v1", history: ["v1"] },
+          quality: { current: "v1", history: ["v1"] },
+          review: { current: "v1", history: ["v1"] },
+          documentation: { current: "v1", history: ["v1"] }
+        },
+        metrics: {
+          estimatedCostUsd: 0.5,
+          actualCostUsd: 0.1,
+          durationMs: Date.now() - startTime,
+          totalTasks: tasks.length
+        },
+        approvals: [
+          { stage: "research", status: "Approved", approvedAt: new Date().toISOString(), approver: "ResearchAI" },
+          { stage: "planning", status: "Approved", approvedAt: new Date().toISOString(), approver: "PlannerAI" },
+          { stage: "architecture", status: "Approved", approvedAt: new Date().toISOString(), approver: "ArchitectAI" },
+          { stage: "review", status: "Approved", approvedAt: new Date().toISOString(), approver: "ReviewerAI" }
+        ],
+        dataset: {
+          logsDir: `dataset/${projectId}`,
+          trainingSamplesCount: 1
+        }
+      }
+
+      fs.writeFileSync(path.join(datasetDir, "ProjectManifest.json"), JSON.stringify(manifest, null, 2))
+      context.logger("ProjectManifest.json saved successfully.")
 
       const totalDuration = Date.now() - startTime
       this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
@@ -562,9 +629,11 @@ export class Orchestrator {
           "architecture/architecture.json", 
           "planning/tasks.json",
           "quality/qa-report.md",
-          "review/review-summary.md"
+          "review/review-summary.md",
+          "documentation/docs-report.json",
+          "ProjectManifest.json"
         ],
-        logs: ["Orchestrator pipeline completed all planning, QA, and Reviewer gates successfully!"],
+        logs: ["Orchestrator pipeline completed all stages and compiled ProjectManifest index successfully!"],
         metrics: {
           tokenCount: 0,
           durationMs: totalDuration

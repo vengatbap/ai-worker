@@ -268,6 +268,84 @@ export interface ReviewArtifact {
   report: ReviewReport;
 }
 
+export interface DocumentationMetrics {
+  coverage: number;
+  brokenLinks: number;
+  missingSections: number;
+  apiCoverage: number;
+  exampleCoverage: number;
+  readability: number;
+  overallScore: number;
+}
+
+export interface DocumentationReport {
+  projectDocs: { README: boolean; ARCHITECTURE: boolean; CHANGELOG: boolean };
+  developerDocs: { folderStructure: boolean; extensionGuide: boolean };
+  apiDocs: { endpointsDocs: boolean; sdkExamples: boolean };
+  userDocs: { userManual: boolean; troubleshooting: boolean };
+  releaseDocs: { releaseNotes: boolean; breakingChanges: boolean };
+  knowledgeBase: { faq: boolean; bestPractices: boolean };
+  metrics: DocumentationMetrics;
+  recommendations: string[];
+}
+
+export interface KnowledgeBase {
+  documents: string[];
+  api: string[];
+  architecture: string[];
+  faq: Array<{ question: string; answer: string }>;
+  guides: string[];
+  examples: string[];
+  references: string[];
+}
+
+export interface ProjectManifest {
+  projectId: string;
+  currentStage: "research" | "planning" | "architecture" | "execution" | "quality" | "review" | "documentation" | "deployment";
+  metadata: {
+    projectName: string;
+    createdAt: string;
+    updatedAt: string;
+    version: string;
+  };
+  workflow: {
+    stages: string[];
+    activeStage: string;
+  };
+  artifacts: {
+    research?: string;
+    planning?: string;
+    architecture?: string;
+    execution?: string;
+    quality?: string;
+    review?: string;
+    documentation?: string;
+    deployment?: string;
+  };
+  versions: Record<string, { current: string; history: string[] }>;
+  metrics: {
+    estimatedCostUsd: number;
+    actualCostUsd: number;
+    durationMs: number;
+    totalTasks: number;
+  };
+  approvals: Array<{ stage: string; status: ArtifactStatus; approvedAt: string; approver: string }>;
+  dataset: {
+    logsDir: string;
+    trainingSamplesCount: number;
+  };
+  deployment?: {
+    status: string;
+    url?: string;
+    environment?: string;
+  };
+}
+
+export interface DocumentationArtifact {
+  metadata: ArtifactMetadata;
+  report: DocumentationReport;
+}
+
 export interface ExecutionContext {
   projectId: string;
   workspaceId: string;
