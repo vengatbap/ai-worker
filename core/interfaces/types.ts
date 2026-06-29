@@ -189,6 +189,55 @@ export interface ExecutionReport {
   qualityScore: number;
 }
 
+export interface Defect {
+  id: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  category: "Build" | "Lint" | "Test" | "Security" | "Performance" | "Accessibility";
+  description: string;
+  suggestedFix: string;
+  status: "Open" | "Resolved";
+  source: string;
+  affectedFiles: string[];
+  taskId: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  rootCause?: "TypeError" | "MissingImport" | "WrongInterface" | "DependencyError" | "Unknown";
+}
+
+export interface ValidationResult {
+  build: { passed: boolean; logs: string[] };
+  lint: { passed: boolean; warnings: number; errors: number };
+  tests: { passed: number; failed: number; coveragePercent: number };
+  security: { issuesFound: number; severityBreakdown: Record<string, number> };
+  performance: { passed: boolean; recommendations: string[] };
+  accessibility: { passed: boolean; ARIAIssues: number };
+}
+
+export interface QualityMetrics {
+  buildTimeMs: number;
+  testTimeMs: number;
+  coveragePercent: number;
+  complexity: "easy" | "medium" | "hard";
+  technicalDebtHours: number;
+  maintainabilityScore: number;
+  securityScore: number;
+  performanceScore: number;
+  overallScore: number;
+}
+
+export interface QualityReport {
+  taskId: string;
+  validation: ValidationResult;
+  defects: Defect[];
+  metrics: QualityMetrics;
+  recommendations: string[];
+}
+
+export interface QualityArtifact {
+  metadata: ArtifactMetadata;
+  report: QualityReport;
+}
+
 export interface ExecutionContext {
   projectId: string;
   workspaceId: string;

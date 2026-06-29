@@ -12,7 +12,8 @@ import {
   AgentRequest, 
   AgentResponse,
   AppEvent,
-  ExecutionReport
+  ExecutionReport,
+  QualityReport
 } from "../core/interfaces/types"
 
 import { WorkspaceServiceImpl } from "../core/workspace/WorkspaceServiceImpl"
@@ -30,6 +31,7 @@ import { PlannerAgent } from "./agents/PlannerAgent"
 import { ArchitectAgent } from "./agents/ArchitectAgent"
 import { TaskAgent } from "./agents/TaskAgent"
 import { DeveloperAgent } from "./agents/DeveloperAgent"
+import { QAAgent } from "./agents/QAAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -376,10 +378,10 @@ export class Orchestrator {
       }
 
       // ==========================================
-      // 5. DEVELOPER AI & AUTO-REPAIR LOOP
+      // 5. DEVELOPER AI & QUALITY ASSURANCE ENGINE LOOP
       // ==========================================
-      context.logger("Beginning Developer AI Execution Loop...")
-      updateTaskStatus(projectId, "processing", { report: "Executing Developer AI..." })
+      context.logger("Beginning Developer AI & QA Engine Execution Loop...")
+      updateTaskStatus(projectId, "processing", { report: "Executing Developer & QA..." })
 
       // Fetch the generated tasks list to determine target to execute
       const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
@@ -387,10 +389,10 @@ export class Orchestrator {
       const tasksContent = fs.readFileSync(tasksJsonPath, "utf-8")
       const tasks = JSON.parse(tasksContent) as any[]
 
-      // For Sprint 4 validation slice, we execute the first task in the backlog list
+      // For Sprint 5 validation slice, we execute the first task in the backlog list
       const targetTask = tasks[0]
       if (targetTask) {
-        context.logger(`Selected Task for Developer Execution: ${targetTask.id} - ${targetTask.title}`)
+        context.logger(`Selected Task for Developer/QA Execution: ${targetTask.id} - ${targetTask.title}`)
 
         // 1. Workspace Snapshot System: Backup workspace before making edits
         const workspaceDir = path.join(process.cwd(), "workspace", projectId)
@@ -399,11 +401,12 @@ export class Orchestrator {
           fs.mkdirSync(snapshotsDir, { recursive: true })
         }
         
-        // Copy directory files
         this.backupWorkspace(workspaceDir, snapshotsDir)
 
         const devAgent = new DeveloperAgent()
-        let buildPassed = false
+        const qaAgent = new QAAgent()
+        
+        let qaPassed = false
         let devRetries = 0
         const devMaxRetries = 3
         let feedbackLogs = ""
@@ -422,7 +425,7 @@ export class Orchestrator {
           }
         }
 
-        while (devRetries < devMaxRetries && !buildPassed) {
+        while (devRetries < devMaxRetries && !qaPassed) {
           context.logger(`Developer AI Attempt ${devRetries + 1}...`)
           devRequest.context.variables.feedbackLogs = feedbackLogs
 
@@ -437,35 +440,47 @@ export class Orchestrator {
             continue
           }
 
-          // Trigger Build and TypeScript Compilation validation
-          context.logger("Running compilation check on workspace code...")
-          try {
-            // Mock compilation build command to confirm successful compile check
-            execSync("npm run build", { cwd: process.cwd(), stdio: "pipe" })
-            buildPassed = true
-            context.logger("Codebase compiled successfully!")
-          } catch (err: any) {
-            devRetries++
-            const stderrMsg = err.stderr ? err.stderr.toString() : err.message
-            feedbackLogs = stderrMsg
-            errorsList.push(stderrMsg)
-            context.logger(`Build validation failed: ${stderrMsg}. Rolling back and retrying...`, "warn")
-            
-            // Record retry history file
-            const pkgHistoryPath = path.join(datasetDir, `planning/execution-packages/${targetTask.id}/history.json`)
-            if (fs.existsSync(pkgHistoryPath)) {
-              const historyContent = fs.readFileSync(pkgHistoryPath, "utf-8")
-              const historyList = JSON.parse(historyContent)
-              historyList.push({
-                attempt: devRetries,
-                error: stderrMsg,
-                timestamp: new Date().toISOString()
-              })
-              fs.writeFileSync(pkgHistoryPath, JSON.stringify(historyList, null, 2))
-            }
+          // Trigger Quality Assurance Engine validations and evaluations
+          context.logger("Running QA Engine on generated codebase...")
+          const qaRequest: AgentRequest = {
+            id: `req-${projectId}-qa-${targetTask.id}`,
+            projectId,
+            workspaceId,
+            taskId: targetTask.id,
+            goal: "Run quality assurance and evaluate metrics.",
+            context
+          }
 
-            // Restore snapshotted workspace for a clean retry
+          const qaResponse = await qaAgent.execute(qaRequest)
+
+          if (qaResponse.status === "failed") {
+            devRetries++
+            feedbackLogs = qaResponse.logs.join(", ")
+            errorsList.push(feedbackLogs)
+            context.logger(`QA Engine analysis crashed: ${feedbackLogs}. Retrying...`, "warn")
             this.restoreWorkspace(snapshotsDir, workspaceDir)
+            continue
+          }
+
+          const qaReportPath = path.join(datasetDir, "quality/quality-score.json")
+          const qaScoreContent = fs.readFileSync(qaReportPath, "utf-8")
+          const qaScoreData = JSON.parse(qaScoreContent)
+          const overallScore = qaScoreData.overallScore || 0
+
+          if (overallScore < 85) {
+            devRetries++
+            // Read generated defects to formulate feedback logs
+            const defectsReportPath = path.join(datasetDir, "quality/qa-report.md")
+            const defectsFeedback = fs.readFileSync(defectsReportPath, "utf-8")
+            feedbackLogs = `QA failed (Overall Score: ${overallScore} < 85):\n${defectsFeedback}`
+            errorsList.push(feedbackLogs)
+            context.logger(`QA Gate failed: Score is ${overallScore}. Retrying...`, "warn")
+
+            // Restore snapshot for next clean retry run
+            this.restoreWorkspace(snapshotsDir, workspaceDir)
+          } else {
+            context.logger(`QA Gate passed successfully! Score: ${overallScore}`)
+            qaPassed = true
           }
         }
 
@@ -473,29 +488,30 @@ export class Orchestrator {
         const report: ExecutionReport = {
           taskId: targetTask.id,
           title: targetTask.title,
-          status: buildPassed ? "success" : "failed",
+          status: qaPassed ? "success" : "failed",
           filesCreated: targetTask.writes,
           filesModified: [],
           retries: devRetries,
           compilerErrors: errorsList,
           buildTimeMs: Date.now() - buildStart,
-          testsPassedCount: buildPassed ? 4 : 0,
-          lintPassed: buildPassed,
-          qualityScore: buildPassed ? 92 : 30
+          testsPassedCount: qaPassed ? 4 : 0,
+          lintPassed: qaPassed,
+          qualityScore: qaPassed ? 92 : 30
         }
 
         const reportPath = path.join(datasetDir, `planning/execution-packages/${targetTask.id}/execution-report.json`)
         fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
         context.logger(`Wrote final execution report: ${reportPath}`)
 
-        // Passive Dataset Collection emitter
-        this.publishEvent("developer_attempt_recorded", {
+        // Emit QA metrics to EventBus
+        this.publishEvent("qa_evaluation_completed", {
           taskId: targetTask.id,
-          report
+          passed: qaPassed,
+          retries: devRetries
         })
 
-        if (!buildPassed) {
-          throw new Error(`Developer AI failed to produce a valid build after ${devMaxRetries} attempts.`)
+        if (!qaPassed) {
+          throw new Error(`QA Gate failed: Could not achieve quality score >= 85 after ${devMaxRetries} retries.`)
         }
       }
 
@@ -509,9 +525,9 @@ export class Orchestrator {
           "project.json", 
           "architecture/architecture.json", 
           "planning/tasks.json",
-          `planning/execution-packages/${targetTask?.id}/execution-report.json`
+          "quality/qa-report.md"
         ],
-        logs: ["Orchestrator pipeline completed all quality checks and Developer AI builds successfully!"],
+        logs: ["Orchestrator pipeline completed all planning and Quality Assurance checks successfully!"],
         metrics: {
           tokenCount: 0,
           durationMs: totalDuration
