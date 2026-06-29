@@ -12,6 +12,7 @@
     "worker": "tsx run-worker.ts",
     "worker:loop": "tsx worker/loop-runner.ts",
     "validate": "tsx scripts/evp-validation-runner.ts",
+    "project-lab": "tsx scripts/evp-project-lab.ts",
     "configure-ai": "tsx configure-ai.ts",
     "show-models": "tsx show-models.ts",
     "use:openai": "tsx configure-ai.ts openai",
