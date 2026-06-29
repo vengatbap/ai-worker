@@ -26,6 +26,7 @@ import { LearningServiceImpl } from "../core/learning/LearningServiceImpl"
 
 import { ResearchAgent } from "./agents/ResearchAgent"
 import { PlannerAgent } from "./agents/PlannerAgent"
+import { ArchitectAgent } from "./agents/ArchitectAgent"
 
 import { updateTaskStatus } from "../src/lib/db"
 import fs from "fs"
@@ -110,13 +111,11 @@ export class Orchestrator {
           continue
         }
 
-        // Save raw artifact draft in the Artifact Store
         const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
         const researchJsonPath = path.join(datasetDir, "research.json")
         const researchJsonContent = fs.readFileSync(researchJsonPath, "utf-8")
         const parsedResearch = JSON.parse(researchJsonContent)
 
-        // Convert metadata details to Artifact types
         const draftArtifact = await this.artifactService.saveArtifact(
           projectId, 
           "research", 
@@ -124,17 +123,14 @@ export class Orchestrator {
           parsedResearch.metadata
         )
 
-        // Update artifact status to Evaluating
         await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Evaluating")
 
-        // Run evaluation checks
         context.logger("Evaluating Research Artifact...")
         const evalResult = await this.evaluationService.evaluateArtifact(
           draftArtifact, 
           "The artifact must contain Executive Summary, Competitors Analysis, and Tech Recommendations. Minimum quality score must be greater than 85."
         )
 
-        // Record metrics
         this.publishEvent("metrics_recorded", {
           agent: "Research",
           model: this.modelRouter.route("Research").model,
@@ -154,7 +150,6 @@ export class Orchestrator {
           continue
         }
 
-        // Quality check passed
         context.logger(`Research Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Approved")
         break
@@ -184,7 +179,6 @@ export class Orchestrator {
           continue
         }
 
-        // Save raw artifact draft in the Artifact Store
         const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
         const projectJsonPath = path.join(datasetDir, "project.json")
         const projectJsonContent = fs.readFileSync(projectJsonPath, "utf-8")
@@ -197,17 +191,14 @@ export class Orchestrator {
           parsedProject.metadata
         )
 
-        // Update status to Evaluating
         await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Evaluating")
 
-        // Run evaluation checks
         context.logger("Evaluating Planner Artifact...")
         const evalResult = await this.evaluationService.evaluateArtifact(
           draftArtifact, 
           "The artifact must contain functional requirements list, MVP scope detail, roadmap phases, and milestone definitions. Minimum quality score must be greater than 90."
         )
 
-        // Record metrics
         this.publishEvent("metrics_recorded", {
           agent: "Planner",
           model: this.modelRouter.route("Planner").model,
@@ -227,7 +218,6 @@ export class Orchestrator {
           continue
         }
 
-        // Quality check passed
         context.logger(`Planner Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Approved")
         break
@@ -237,12 +227,86 @@ export class Orchestrator {
         throw new Error("Planning Phase failed to meet quality thresholds after maximum retries.")
       }
 
+      // ==========================================
+      // 3. ARCHITECTURE DESIGN PHASE
+      // ==========================================
+      context.logger("Executing Architect Agent...")
+      updateTaskStatus(projectId, "processing", { report: "Executing Architect Agent..." })
+
+      const architectAgent = new ArchitectAgent()
+      let archResponse: AgentResponse | null = null
+      let archRetries = 0
+
+      while (archRetries < maxRetries) {
+        archResponse = await architectAgent.execute(agentRequest)
+        this.publishEvent("agent_executed", { agent: "Architect", status: archResponse.status, retryCount: archRetries })
+
+        if (archResponse.status === "failed") {
+          archRetries++
+          context.logger(`Architect attempt failed: ${archResponse.logs.join(", ")}. Retrying...`, "warn")
+          continue
+        }
+
+        const datasetDir = path.resolve(process.cwd(), "dataset", projectId)
+        const archJsonPath = path.join(datasetDir, "architecture/architecture.json")
+        const archJsonContent = fs.readFileSync(archJsonPath, "utf-8")
+        const parsedArch = JSON.parse(archJsonContent)
+
+        const draftArtifact = await this.artifactService.saveArtifact(
+          projectId, 
+          "architecture", 
+          archJsonContent, 
+          parsedArch.metadata
+        )
+
+        await this.artifactService.updateArtifactStatus(projectId, "architecture", draftArtifact.version, "Evaluating")
+
+        context.logger("Evaluating Architect Artifact...")
+        const evalResult = await this.evaluationService.evaluateArtifact(
+          draftArtifact, 
+          "The artifact must contain folderTree definition, tables database schema design, and dependencyGraph connections list. Minimum quality score must be greater than 85."
+        )
+
+        this.publishEvent("metrics_recorded", {
+          agent: "Architect",
+          model: this.modelRouter.route("Architect").model,
+          provider: this.modelRouter.route("Architect").provider,
+          durationMs: archResponse.metrics.durationMs,
+          promptTokens: 0,
+          completionTokens: 0,
+          estimatedCost: 0,
+          retryCount: archRetries,
+          qualityScore: evalResult.score
+        })
+
+        if (evalResult.score < 85) {
+          archRetries++
+          context.logger(`Architect Quality Check failed (Score: ${evalResult.score} < 85): ${evalResult.feedback}. Retrying...`, "warn")
+          await this.artifactService.updateArtifactStatus(projectId, "architecture", draftArtifact.version, "Rejected")
+          continue
+        }
+
+        context.logger(`Architect Quality Check passed! Score: ${evalResult.score}`)
+        await this.artifactService.updateArtifactStatus(projectId, "architecture", draftArtifact.version, "Approved")
+        break
+      }
+
+      if (!archResponse || archResponse.status === "failed" || archRetries >= maxRetries) {
+        throw new Error("Architecture Phase failed to meet quality thresholds after maximum retries.")
+      }
+
       const totalDuration = Date.now() - startTime
       this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
 
       return {
         status: "success",
-        generatedArtifacts: ["research.json", "research.md", "project.json", "product-plan.md"],
+        generatedArtifacts: [
+          "research.json", 
+          "project.json", 
+          "architecture/architecture.json", 
+          "architecture/database.json", 
+          "architecture/openapi.yaml"
+        ],
         logs: ["Orchestrator pipeline completed all quality checks successfully!"],
         metrics: {
           tokenCount: 0,

@@ -63,6 +63,39 @@ export interface PlannerArtifact {
   acceptanceCriteria: string[];
 }
 
+export interface ArchitectArtifact {
+  metadata: ArtifactMetadata;
+  systemArchitecture: string;
+  folderTree: Record<string, any>;
+  databaseSchema: {
+    tables: Array<{
+      name: string;
+      columns: Array<{ name: string; type: string; constraints?: string[] }>;
+      relations?: Array<{ table: string; field: string; type: "one-to-many" | "many-to-one" | "one-to-one" }>;
+    }>;
+  };
+  apiSchema: Array<{
+    path: string;
+    method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+    description: string;
+    requestBody?: Record<string, any>;
+    responseBody?: Record<string, any>;
+  }>;
+  techStack: string[];
+  securityArchitecture: string;
+  deploymentArchitecture: string;
+  integrations: string[];
+  codingStandards: string[];
+  constraints: string[];
+  assumptions: string[];
+  risks: string[];
+  dependencyGraph: Array<{ from: string; to: string }>;
+  erdMermaid: string;
+  openapiYaml: string;
+  architectureYaml: string;
+  adrs: Array<{ title: string; filename: string; decision: string; status: string; context: string }>;
+}
+
 export interface ExecutionContext {
   projectId: string;
   workspaceId: string;
