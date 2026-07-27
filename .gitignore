@@ -43,4 +43,7 @@ next-env.d.ts
 # local datasets and sandbox
 /dataset/
 /workspace/
+/repo/
+/db.json
+
 
