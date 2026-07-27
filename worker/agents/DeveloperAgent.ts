@@ -2,6 +2,7 @@ import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, ExecutionPackageV2 } from "../../core/interfaces/types"
 import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import { ScopeMatcher } from "../../core/policy/ScopeMatcher"
+import { ScopePolicyEngine } from "../../core/policy/ScopePolicyEngine"
 import { WorkspaceServiceImpl } from "../../core/workspace/WorkspaceServiceImpl"
 import fs from "fs"
 import path from "path"
@@ -94,36 +95,102 @@ export class DeveloperAgent extends BaseAgent {
       // ==========================================
       for (const filepath of changePlan.create) {
         if (!ScopeMatcher.isCreateAllowed(req.projectId, filepath, executionPackage)) {
-          req.context.logger(`Safety Guard Violation: Attempted unauthorized file creation ${filepath}`, "error")
-          return {
-            status: "failed",
-            generatedArtifacts: [],
-            logs: [`CAPABILITY_DENIED: operation: CREATE, path: ${filepath}, reason: OUTSIDE_CREATE_SCOPE`],
-            metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+          req.context.logger(`Scope mismatch: File creation outside scope detected: ${filepath}. Querying policy engine...`)
+          
+          const capabilityRequest = {
+            requestId: `req-expand-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+            projectId: req.projectId,
+            taskId: req.taskId,
+            packageVersion: executionPackage.packageVersion,
+            workspaceVersion: currentStatus.currentVersion,
+            operation: "CREATE" as const,
+            resource: filepath,
+            reason: "Developer AI needs to create helper component/file for task resolution.",
+            requestedAt: new Date().toISOString()
+          }
+
+          const decision = await ScopePolicyEngine.evaluateRequest(capabilityRequest, executionPackage)
+          if (decision.decision === "AUTO_APPROVED") {
+            req.context.logger(`Policy Engine AUTO_APPROVED scope expansion for CREATE ${filepath} (Version revised to v${decision.packageVersion})`)
+            // Reload package
+            const taskPkgPath = path.join(datasetDir, `planning/execution-packages/${req.taskId}/v1.json`)
+            Object.assign(executionPackage, JSON.parse(fs.readFileSync(taskPkgPath, "utf-8")))
+          } else {
+            req.context.logger(`Policy Engine rejected scope expansion for CREATE ${filepath} (Decision: ${decision.decision}, Reason: ${decision.reasonCode})`, "error")
+            return {
+              status: "failed",
+              generatedArtifacts: [],
+              logs: [`CAPABILITY_DENIED: operation: CREATE, path: ${filepath}, reason: ${decision.reasonCode}`],
+              metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+            }
           }
         }
       }
 
       for (const filepath of changePlan.modify) {
         if (!ScopeMatcher.isWriteAllowed(req.projectId, filepath, executionPackage)) {
-          req.context.logger(`Safety Guard Violation: Attempted unauthorized file modification ${filepath}`, "error")
-          return {
-            status: "failed",
-            generatedArtifacts: [],
-            logs: [`CAPABILITY_DENIED: operation: WRITE, path: ${filepath}, reason: OUTSIDE_WRITE_SCOPE`],
-            metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+          req.context.logger(`Scope mismatch: File modification outside scope detected: ${filepath}. Querying policy engine...`)
+          
+          const capabilityRequest = {
+            requestId: `req-expand-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+            projectId: req.projectId,
+            taskId: req.taskId,
+            packageVersion: executionPackage.packageVersion,
+            workspaceVersion: currentStatus.currentVersion,
+            operation: "MODIFY" as const,
+            resource: filepath,
+            reason: "Developer AI needs to modify file for task resolution.",
+            requestedAt: new Date().toISOString()
+          }
+
+          const decision = await ScopePolicyEngine.evaluateRequest(capabilityRequest, executionPackage)
+          if (decision.decision === "AUTO_APPROVED") {
+            req.context.logger(`Policy Engine AUTO_APPROVED scope expansion for MODIFY ${filepath} (Version revised to v${decision.packageVersion})`)
+            // Reload package
+            const taskPkgPath = path.join(datasetDir, `planning/execution-packages/${req.taskId}/v1.json`)
+            Object.assign(executionPackage, JSON.parse(fs.readFileSync(taskPkgPath, "utf-8")))
+          } else {
+            req.context.logger(`Policy Engine rejected scope expansion for MODIFY ${filepath} (Decision: ${decision.decision}, Reason: ${decision.reasonCode})`, "error")
+            return {
+              status: "failed",
+              generatedArtifacts: [],
+              logs: [`CAPABILITY_DENIED: operation: MODIFY, path: ${filepath}, reason: ${decision.reasonCode}`],
+              metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+            }
           }
         }
       }
 
       for (const filepath of changePlan.delete) {
         if (!ScopeMatcher.isDeleteAllowed(req.projectId, filepath, executionPackage)) {
-          req.context.logger(`Safety Guard Violation: Attempted unauthorized file deletion ${filepath}`, "error")
-          return {
-            status: "failed",
-            generatedArtifacts: [],
-            logs: [`CAPABILITY_DENIED: operation: DELETE, path: ${filepath}, reason: OUTSIDE_DELETE_SCOPE`],
-            metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+          req.context.logger(`Scope mismatch: File deletion outside scope detected: ${filepath}. Querying policy engine...`)
+          
+          const capabilityRequest = {
+            requestId: `req-expand-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+            projectId: req.projectId,
+            taskId: req.taskId,
+            packageVersion: executionPackage.packageVersion,
+            workspaceVersion: currentStatus.currentVersion,
+            operation: "DELETE" as const,
+            resource: filepath,
+            reason: "Developer AI needs to delete file.",
+            requestedAt: new Date().toISOString()
+          }
+
+          const decision = await ScopePolicyEngine.evaluateRequest(capabilityRequest, executionPackage)
+          if (decision.decision === "AUTO_APPROVED") {
+            req.context.logger(`Policy Engine AUTO_APPROVED scope expansion for DELETE ${filepath} (Version revised to v${decision.packageVersion})`)
+            // Reload package
+            const taskPkgPath = path.join(datasetDir, `planning/execution-packages/${req.taskId}/v1.json`)
+            Object.assign(executionPackage, JSON.parse(fs.readFileSync(taskPkgPath, "utf-8")))
+          } else {
+            req.context.logger(`Policy Engine rejected scope expansion for DELETE ${filepath} (Decision: ${decision.decision}, Reason: ${decision.reasonCode})`, "error")
+            return {
+              status: "failed",
+              generatedArtifacts: [],
+              logs: [`CAPABILITY_DENIED: operation: DELETE, path: ${filepath}, reason: ${decision.reasonCode}`],
+              metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+            }
           }
         }
       }

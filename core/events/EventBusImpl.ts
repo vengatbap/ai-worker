@@ -1,7 +1,15 @@
 import { EventBus, AppEvent } from "../interfaces/types"
 
 export class EventBusImpl implements EventBus {
+  private static instance: EventBusImpl
   private handlers: Record<string, ((event: AppEvent) => void)[]> = {}
+
+  constructor() {
+    if (EventBusImpl.instance) {
+      return EventBusImpl.instance
+    }
+    EventBusImpl.instance = this
+  }
 
   publish(event: AppEvent): void {
     const eventHandlers = this.handlers[event.type] || []

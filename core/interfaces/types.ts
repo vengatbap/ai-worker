@@ -165,6 +165,45 @@ export interface ExecutionPackageV2 {
   };
 }
 
+export interface CapabilityRequest {
+  requestId: string;
+  projectId: string;
+  taskId: string;
+
+  packageVersion: number;
+  workspaceVersion: number;
+
+  operation:
+    | "READ"
+    | "CREATE"
+    | "MODIFY"
+    | "DELETE"
+    | "EXECUTE"
+    | "INSTALL"
+    | "NETWORK";
+
+  resource: string;
+  reason: string;
+
+  requestedAt: string;
+}
+
+export interface PolicyDecision {
+  requestId: string;
+
+  decision:
+    | "AUTO_APPROVED"
+    | "DENIED"
+    | "REQUIRES_APPROVAL";
+
+  reasonCode: string;
+  explanation: string;
+
+  grantedScope?: string;
+  packageVersion?: number;
+}
+
+
 
 export interface PlanningMetrics {
   estimatedDuration: number;
