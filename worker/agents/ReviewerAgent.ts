@@ -41,7 +41,7 @@ export class ReviewerAgent extends BaseAgent {
     const executionPackage = JSON.parse(packageJsonContent)
 
     // Load generated workspace code contents
-    const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId)
+    const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId, "repository")
     const filesData: Array<{ filepath: string; content: string }> = []
     
     for (const file of executionPackage.writes) {

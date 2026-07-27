@@ -1,5 +1,40 @@
 [
   {
+    "id": "1782865000127r7tmx",
+    "name": "Step 1: User Schema Setup",
+    "status": "pending",
+    "timestamp": "03:16:40",
+    "description": "Create the Users Table schema in the database. Modify the database/models/User.js file to define the user model with attributes: id, name, email, password, and role. Establish relationships with other tables as necessary. Implement password hashing using a library like bcrypt."
+  },
+  {
+    "id": "1782865000122x0rqt",
+    "name": "Step 2: Lead Capture and Management API",
+    "status": "pending",
+    "timestamp": "03:16:40",
+    "description": "Develop the Core Module's lead capture functionality. Create API endpoints in routes/lead.js for creating, reading, updating, and deleting (CRUD) leads. Define the Leads Table schema with columns: id, name, phone_number, source, and status. Implement API validation and error handling using a library like Joi."
+  },
+  {
+    "id": "178286500011894aa9",
+    "name": "Step 3: Conversation History and Follow-ups",
+    "status": "pending",
+    "timestamp": "03:16:40",
+    "description": "Design and implement the conversation history and follow-up reminders features. Create the Conversations Table and FollowUps Table schemas. Develop API endpoints in routes/conversation.js and routes/followup.js to manage conversation history and follow-ups. Integrate with the Leads Table to associate conversations and follow-ups with specific leads."
+  },
+  {
+    "id": "1782865000114hq94r",
+    "name": "Step 4: Billing and Subscription Management",
+    "status": "pending",
+    "timestamp": "03:16:40",
+    "description": "Implement the Billing Module's subscription management functionality. Create the Subscriptions Table and Payments Table schemas. Develop API endpoints in routes/subscription.js and routes/payment.js to manage subscription plans and payment records. Integrate with a payment gateway like Stripe to process payments and update the Payments Table accordingly."
+  },
+  {
+    "id": "1782864999908si3ok",
+    "name": "Step 5: User Dashboard and Analytics",
+    "status": "pending",
+    "timestamp": "03:16:39",
+    "description": "Develop the dashboard feature to display lead conversion rates, conversation history, and follow-up reminders. Create API endpoints in routes/dashboard.js to fetch and display relevant data. Implement data visualization using a library like Chart.js to display key metrics and KPIs. Ensure the dashboard is accessible only to authenticated users with the appropriate role-based access control."
+  },
+  {
     "id": "1782716965084",
     "name": "SaaS Dev Task 2",
     "status": "success",

@@ -93,7 +93,7 @@ export class DeveloperAgent extends BaseAgent {
       }
 
       // Execute code writes to the target workspace folder
-      const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId)
+      const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId, "repository")
       const generatedList: string[] = []
 
       for (const file of filesToWrite) {

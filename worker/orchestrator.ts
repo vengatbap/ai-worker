@@ -382,7 +382,7 @@ export class Orchestrator {
       }
 
       // ==========================================
-      // 5. DEVELOPER AI ➡️ QUALITY ASSURANCE ➡️ REVIEWER AI LOOP
+      // 5. DEVELOPER AI ➡️ QUALITY ASSURANCE ➡️ REVIEWER AI LOOP (TRANSACTIONAL)
       // ==========================================
       context.logger("Beginning Engineering Governance Execution Loop...")
       updateTaskStatus(projectId, "processing", { report: "Running Developer, QA, and Reviewer loops..." })
@@ -396,13 +396,31 @@ export class Orchestrator {
       if (targetTask) {
         context.logger(`Selected Task for Developer/QA/Reviewer Loop: ${targetTask.id} - ${targetTask.title}`)
 
-        const workspaceDir = path.join(process.cwd(), "workspace", projectId)
-        const snapshotsDir = path.join(workspaceDir, "snapshots", `before-${targetTask.id}`)
-        if (!fs.existsSync(snapshotsDir)) {
-          fs.mkdirSync(snapshotsDir, { recursive: true })
+        // Verify Workspace integrity
+        const isVerified = await this.workspaceService.verifyWorkspace(projectId)
+        if (!isVerified) {
+          await this.workspaceService.updateWorkspaceState(projectId, "CORRUPTED")
+          throw new Error(`Workspace verification failed. Project ${projectId} marked CORRUPTED.`)
         }
-        
-        this.backupWorkspace(workspaceDir, snapshotsDir)
+
+        // Check current workspace state
+        const status = await this.workspaceService.getWorkspaceStatus(projectId)
+        if (status.state === "CORRUPTED" || status.state === "RECOVERY_REQUIRED") {
+          throw new Error(`Execution aborted: Workspace is in ${status.state} state and requires manual recovery.`)
+        }
+
+        // Acquire lock
+        const locked = await this.workspaceService.acquireLock(projectId, targetTask.id)
+        if (!locked) {
+          throw new Error(`Workspace lock collision: Workspace for project ${projectId} is already locked by task ${status.lockedByTask}`)
+        }
+
+        // Create pre-task snapshot
+        context.logger("Creating pre-task workspace snapshot...")
+        await this.workspaceService.updateWorkspaceState(projectId, "SNAPSHOTTING")
+        await this.workspaceService.createSnapshot(projectId, targetTask.id, `Pre-task snapshot for ${targetTask.id}`)
+
+        await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
 
         const devAgent = new DeveloperAgent()
         const qaAgent = new QAAgent()
@@ -438,7 +456,10 @@ export class Orchestrator {
             feedbackLogs = devResponse.logs.join(", ")
             errorsList.push(feedbackLogs)
             context.logger(`Developer Generation failed: ${feedbackLogs}`, "warn")
-            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            context.logger("Restoring workspace from snapshot...")
+            await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+            await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+            await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
             continue
           }
 
@@ -452,6 +473,7 @@ export class Orchestrator {
             context
           }
 
+          await this.workspaceService.updateWorkspaceState(projectId, "VALIDATING")
           const qaResponse = await qaAgent.execute(qaRequest)
 
           if (qaResponse.status === "failed") {
@@ -459,7 +481,10 @@ export class Orchestrator {
             feedbackLogs = qaResponse.logs.join(", ")
             errorsList.push(feedbackLogs)
             context.logger(`QA Engine validation failed: ${feedbackLogs}. Retrying...`, "warn")
-            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            context.logger("Restoring workspace from snapshot...")
+            await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+            await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+            await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
             continue
           }
 
@@ -474,7 +499,10 @@ export class Orchestrator {
             feedbackLogs = `QA failed (Overall Score: ${overallScore} < 85):\n` + fs.readFileSync(defectsReportPath, "utf-8")
             errorsList.push(feedbackLogs)
             context.logger(`QA validation gate rejected: Score is ${overallScore}. Retrying...`, "warn")
-            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            context.logger("Restoring workspace from snapshot...")
+            await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+            await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+            await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
             continue
           }
 
@@ -495,7 +523,10 @@ export class Orchestrator {
             feedbackLogs = reviewResponse.logs.join(", ")
             errorsList.push(feedbackLogs)
             context.logger(`Reviewer AI evaluation failed: ${reviewResponse.logs.join(", ")}. Retrying...`, "warn")
-            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            context.logger("Restoring workspace from snapshot...")
+            await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+            await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+            await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
             continue
           }
 
@@ -509,7 +540,10 @@ export class Orchestrator {
             feedbackLogs = `Governance Review rejected (PR Decision: ${approvalData.decision}):\n` + fs.readFileSync(reviewSummaryPath, "utf-8")
             errorsList.push(feedbackLogs)
             context.logger(`Reviewer AI requested changes: ${approvalData.decision}. Retrying...`, "warn")
-            this.restoreWorkspace(snapshotsDir, workspaceDir)
+            context.logger("Restoring workspace from snapshot...")
+            await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+            await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+            await this.workspaceService.updateWorkspaceState(projectId, "EXECUTING")
           } else {
             context.logger("Engineering Governance Gate APPROVED successfully!")
             governancePassed = true
@@ -535,10 +569,28 @@ export class Orchestrator {
         fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
         context.logger(`Wrote final execution report: ${reportPath}`)
 
-        if (!governancePassed) {
+        if (governancePassed) {
+          // Commit state successfully
+          await this.workspaceService.updateWorkspaceState(projectId, "COMMITTING")
+          await this.workspaceService.incrementWorkspaceVersion(projectId)
+          await this.workspaceService.releaseLock(projectId, targetTask.id)
+        } else {
+          // Rollback snapshot on failure
+          context.logger("Exhausted retries. Rolling back to clean snapshot state...")
+          await this.workspaceService.updateWorkspaceState(projectId, "ROLLING_BACK")
+          await this.workspaceService.restoreSnapshot(projectId, targetTask.id)
+          
+          const verified = await this.workspaceService.verifyWorkspace(projectId)
+          if (!verified) {
+            await this.workspaceService.updateWorkspaceState(projectId, "CORRUPTED")
+            throw new Error(`Rollback failed. Project workspace ${projectId} is CORRUPTED.`)
+          }
+          
+          await this.workspaceService.releaseLock(projectId, targetTask.id)
           throw new Error(`Governance Reviewer failed to approve the code after ${devMaxRetries} retries.`)
         }
       }
+
 
       // ==========================================
       // 6. KNOWLEDGE PUBLISHING ENGINE (DOCUMENTATION AI) PHASE

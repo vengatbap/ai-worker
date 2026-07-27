@@ -426,13 +426,53 @@ export interface Agent {
   finalize(): Promise<void>;
 }
 
+export type WorkspaceState =
+  | "READY"
+  | "LOCKED"
+  | "SNAPSHOTTING"
+  | "EXECUTING"
+  | "VALIDATING"
+  | "COMMITTING"
+  | "ROLLING_BACK"
+  | "RECOVERY_REQUIRED"
+  | "CORRUPTED";
+
+export interface SnapshotMetadata {
+  projectId: string;
+  taskId: string;
+  createdAt: string;
+  reason: string;
+  previousTask: string;
+  workspaceVersion: number;
+  status: "valid" | "invalid";
+}
+
+export interface WorkspaceStatus {
+  projectId: string;
+  state: WorkspaceState;
+  currentVersion: number;
+  lockedByTask?: string;
+  lastUpdated: string;
+}
+
 export interface WorkspaceService {
   initializeWorkspace(projectId: string): Promise<string>;
   getContext(workspaceId: string): Promise<Record<string, any>>;
   saveContext(workspaceId: string, data: Record<string, any>): Promise<void>;
   getMemory(workspaceId: string): Promise<any[]>;
   addMemory(workspaceId: string, entry: any): Promise<void>;
+  
+  // OS-owned transactional workspace manager methods
+  getWorkspaceStatus(projectId: string): Promise<WorkspaceStatus>;
+  updateWorkspaceState(projectId: string, state: WorkspaceState, lockedByTask?: string): Promise<void>;
+  incrementWorkspaceVersion(projectId: string): Promise<number>;
+  createSnapshot(projectId: string, taskId: string, reason: string): Promise<string>;
+  restoreSnapshot(projectId: string, taskId: string): Promise<void>;
+  verifyWorkspace(projectId: string): Promise<boolean>;
+  acquireLock(projectId: string, taskId: string): Promise<boolean>;
+  releaseLock(projectId: string, taskId: string): Promise<void>;
 }
+
 
 export interface ProviderService {
   callAI(
