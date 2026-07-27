@@ -122,34 +122,49 @@ export interface Task {
   successors: string[];
 }
 
-export interface ExecutionPackage {
+export interface ExecutionPackageV2 {
+  schemaVersion: "2.0";
+  projectId: string;
   taskId: string;
-  title: string;
-  agent: string;
-  reads: string[];
-  writes: string[];
-  deletes: string[];
-  dependencies: string[];
-  tools: string[];
-  modelProfile: string;
-  acceptanceCriteria: string[];
-  buildCommand: string;
-  testCommand: string;
-  lintCommand: string;
-  successCriteria: string[];
+  packageVersion: number;
+
+  workspace: {
+    expectedWorkspaceVersion: number;
+    readScopes: string[];
+    writeScopes: string[];
+    createScopes: string[];
+    deleteScopes: string[];
+    protectedScopes: string[];
+  };
+
+  permissions: {
+    allowFileDiscovery: boolean;
+    allowDependencyInstall: boolean;
+    allowNetworkAccess: boolean;
+    allowedCommands: string[];
+  };
+
   context: {
-    architecture: any;
-    workspaceId: string;
-    artifacts: string[];
-    memory: any[];
-    project: {
-      projectId: string;
-      prompt: string;
-    };
-    variables: Record<string, any>;
-    configuration: Record<string, any>;
+    architectureRefs: string[];
+    artifactRefs: string[];
+    relevantFiles: string[];
+    previousTasks: string[];
+    decisions: string[];
+  };
+
+  execution: {
+    modelProfile: string;
+    maxRetries: number;
+    timeoutMs: number;
+  };
+
+  acceptanceCriteria: string[];
+
+  outputs: {
+    expectedArtifacts: string[];
   };
 }
+
 
 export interface PlanningMetrics {
   estimatedDuration: number;

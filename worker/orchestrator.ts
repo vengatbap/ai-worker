@@ -14,7 +14,8 @@ import {
   AppEvent,
   ExecutionReport,
   QualityReport,
-  ProjectManifest
+  ProjectManifest,
+  ExecutionPackageV2
 } from "../core/interfaces/types"
 
 import { WorkspaceServiceImpl } from "../core/workspace/WorkspaceServiceImpl"
@@ -403,10 +404,20 @@ export class Orchestrator {
           throw new Error(`Workspace verification failed. Project ${projectId} marked CORRUPTED.`)
         }
 
+        // Load task package to read expected version
+        const taskPkgPath = path.join(datasetDir, `planning/execution-packages/${targetTask.id}/v1.json`)
+        const packageJsonContent = fs.readFileSync(taskPkgPath, "utf-8")
+        const executionPackage = JSON.parse(packageJsonContent) as ExecutionPackageV2
+
         // Check current workspace state
         const status = await this.workspaceService.getWorkspaceStatus(projectId)
         if (status.state === "CORRUPTED" || status.state === "RECOVERY_REQUIRED") {
           throw new Error(`Execution aborted: Workspace is in ${status.state} state and requires manual recovery.`)
+        }
+
+        // Validate package freshness against workspace version
+        if (status.currentVersion !== executionPackage.workspace.expectedWorkspaceVersion) {
+          throw new Error(`STALE_WORKSPACE_VERSION: Stale execution package. Expected workspace version ${executionPackage.workspace.expectedWorkspaceVersion} but found version ${status.currentVersion}`)
         }
 
         // Acquire lock

@@ -44,7 +44,8 @@ export class ReviewerAgent extends BaseAgent {
     const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId, "repository")
     const filesData: Array<{ filepath: string; content: string }> = []
     
-    for (const file of executionPackage.writes) {
+    const targetFiles = executionPackage.outputs?.expectedArtifacts || []
+    for (const file of targetFiles) {
       const filePath = path.join(workspaceDir, file)
       if (fs.existsSync(filePath)) {
         filesData.push({

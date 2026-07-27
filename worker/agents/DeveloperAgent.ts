@@ -1,6 +1,8 @@
 import { BaseAgent } from "./BaseAgent"
-import { AgentRequest, AgentResponse, ExecutionPackage } from "../../core/interfaces/types"
+import { AgentRequest, AgentResponse, ExecutionPackageV2 } from "../../core/interfaces/types"
 import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
+import { ScopeMatcher } from "../../core/policy/ScopeMatcher"
+import { WorkspaceServiceImpl } from "../../core/workspace/WorkspaceServiceImpl"
 import fs from "fs"
 import path from "path"
 
@@ -39,7 +41,20 @@ export class DeveloperAgent extends BaseAgent {
     }
 
     const packageJsonContent = fs.readFileSync(taskPkgPath, "utf-8")
-    const executionPackage = JSON.parse(packageJsonContent) as ExecutionPackage
+    const executionPackage = JSON.parse(packageJsonContent) as ExecutionPackageV2
+
+    // Verify Workspace version safety (Stale checks)
+    const wsService = new WorkspaceServiceImpl()
+    const currentStatus = await wsService.getWorkspaceStatus(req.projectId)
+    if (currentStatus.currentVersion !== executionPackage.workspace.expectedWorkspaceVersion) {
+      req.context.logger(`Workspace version mismatch: expected ${executionPackage.workspace.expectedWorkspaceVersion}, found ${currentStatus.currentVersion}`, "error")
+      return {
+        status: "failed",
+        generatedArtifacts: [],
+        logs: [`STALE_WORKSPACE_VERSION: Expected version ${executionPackage.workspace.expectedWorkspaceVersion} but found version ${currentStatus.currentVersion}`],
+        metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+      }
+    }
 
     // Formulate User prompt template
     const userPromptPath = path.resolve(process.cwd(), "prompts/developer/v1/user.md")
@@ -75,34 +90,56 @@ export class DeveloperAgent extends BaseAgent {
       req.context.logger(`Developer Agent formulated change plan: ${JSON.stringify(changePlan)}`)
 
       // ==========================================
-      // SAFETY GUARD: Enforce writes limits
+      // SAFETY GUARD: Enforce writes/creates/deletes limits strictly using ScopeMatcher
       // ==========================================
-      const allowedWrites = new Set(executionPackage.writes)
-      const allowedReads = new Set(executionPackage.reads)
-
-      for (const filepath of [...changePlan.create, ...changePlan.modify]) {
-        if (!allowedWrites.has(filepath)) {
-          req.context.logger(`Safety Guard Violation: Attempted unauthorized write to file ${filepath}`, "error")
+      for (const filepath of changePlan.create) {
+        if (!ScopeMatcher.isCreateAllowed(req.projectId, filepath, executionPackage)) {
+          req.context.logger(`Safety Guard Violation: Attempted unauthorized file creation ${filepath}`, "error")
           return {
             status: "failed",
             generatedArtifacts: [],
-            logs: [`Security violation: Attempted write to unauthorized file ${filepath}`],
+            logs: [`CAPABILITY_DENIED: operation: CREATE, path: ${filepath}, reason: OUTSIDE_CREATE_SCOPE`],
             metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
           }
         }
       }
 
-      // Execute code writes to the target workspace folder
+      for (const filepath of changePlan.modify) {
+        if (!ScopeMatcher.isWriteAllowed(req.projectId, filepath, executionPackage)) {
+          req.context.logger(`Safety Guard Violation: Attempted unauthorized file modification ${filepath}`, "error")
+          return {
+            status: "failed",
+            generatedArtifacts: [],
+            logs: [`CAPABILITY_DENIED: operation: WRITE, path: ${filepath}, reason: OUTSIDE_WRITE_SCOPE`],
+            metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+          }
+        }
+      }
+
+      for (const filepath of changePlan.delete) {
+        if (!ScopeMatcher.isDeleteAllowed(req.projectId, filepath, executionPackage)) {
+          req.context.logger(`Safety Guard Violation: Attempted unauthorized file deletion ${filepath}`, "error")
+          return {
+            status: "failed",
+            generatedArtifacts: [],
+            logs: [`CAPABILITY_DENIED: operation: DELETE, path: ${filepath}, reason: OUTSIDE_DELETE_SCOPE`],
+            metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
+          }
+        }
+      }
+
+      // Execute code writes to the target workspace repository folder
       const workspaceDir = path.resolve(process.cwd(), "workspace", req.projectId, "repository")
       const generatedList: string[] = []
 
       for (const file of filesToWrite) {
-        if (!allowedWrites.has(file.filepath)) {
+        // Double-check writes boundaries
+        if (!ScopeMatcher.isWriteAllowed(req.projectId, file.filepath, executionPackage) && !ScopeMatcher.isCreateAllowed(req.projectId, file.filepath, executionPackage)) {
           req.context.logger(`Safety Guard Violation: Attempted code write to unauthorized target ${file.filepath}`, "error")
           return {
             status: "failed",
             generatedArtifacts: [],
-            logs: [`Security violation: Code payload contained unauthorized write target ${file.filepath}`],
+            logs: [`CAPABILITY_DENIED: operation: WRITE, path: ${file.filepath}, reason: OUTSIDE_WRITE_SCOPE`],
             metrics: { tokenCount: 0, durationMs: Date.now() - startTime }
           }
         }
@@ -142,3 +179,4 @@ export class DeveloperAgent extends BaseAgent {
     }
   }
 }
+

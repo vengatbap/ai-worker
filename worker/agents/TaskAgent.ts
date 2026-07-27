@@ -1,5 +1,5 @@
 import { BaseAgent } from "./BaseAgent"
-import { AgentRequest, AgentResponse, PlanningArtifact, ExecutionPackage } from "../../core/interfaces/types"
+import { AgentRequest, AgentResponse, PlanningArtifact, ExecutionPackageV2 } from "../../core/interfaces/types"
 import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
@@ -146,32 +146,40 @@ export class TaskAgent extends BaseAgent {
           fs.mkdirSync(taskFolder, { recursive: true })
         }
 
-        const executionPackage: ExecutionPackage = {
+                const executionPackage: ExecutionPackageV2 = {
+          schemaVersion: "2.0",
+          projectId: req.projectId,
           taskId: task.id,
-          title: task.title,
-          agent: "DeveloperAI",
-          reads: task.reads,
-          writes: task.writes,
-          deletes: task.deletes,
-          dependencies: task.dependencies,
-          tools: task.requiredTools,
-          modelProfile: task.requiredModels[0] || "developer-medium",
-          acceptanceCriteria: task.acceptanceCriteria,
-          buildCommand: "npm run build",
-          testCommand: "npm test",
-          lintCommand: "npm run lint",
-          successCriteria: ["Compilation passes", "Tests pass", "Lint clean"],
+          packageVersion: 1,
+          workspace: {
+            expectedWorkspaceVersion: 0,
+            readScopes: task.reads && task.reads.length > 0 ? task.reads : ["src/**"],
+            writeScopes: task.writes && task.writes.length > 0 ? task.writes : ["src/**"],
+            createScopes: task.writes && task.writes.length > 0 ? task.writes : ["src/**"],
+            deleteScopes: task.deletes || [],
+            protectedScopes: [".ai/**", "ProjectManifest.json", ".env*"]
+          },
+          permissions: {
+            allowFileDiscovery: true,
+            allowDependencyInstall: false,
+            allowNetworkAccess: false,
+            allowedCommands: ["npm run build", "npm test", "npm run lint"]
+          },
           context: {
-            architecture: parsedArch,
-            workspaceId: req.workspaceId,
-            artifacts: ["architecture/architecture.json", "architecture/database.json"],
-            memory: [],
-            project: {
-              projectId: req.projectId,
-              prompt: req.goal
-            },
-            variables: {},
-            configuration: {}
+            architectureRefs: ["architecture/architecture.json"],
+            artifactRefs: [],
+            relevantFiles: task.reads || [],
+            previousTasks: task.dependencies || [],
+            decisions: []
+          },
+          execution: {
+            modelProfile: task.requiredModels[0] || "developer-medium",
+            maxRetries: 3,
+            timeoutMs: 300000
+          },
+          acceptanceCriteria: task.acceptanceCriteria || [],
+          outputs: {
+            expectedArtifacts: task.writes || []
           }
         }
 
