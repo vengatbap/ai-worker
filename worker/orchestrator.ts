@@ -619,9 +619,23 @@ export class Orchestrator {
         context
       }
 
-      const docResponse = await docAgent.execute(docRequest)
-      if (docResponse.status === "failed") {
-        throw new Error(`Documentation AI execution failed: ${docResponse.logs.join(", ")}`)
+      let docResponse: any = {};
+      let docRetries = 0;
+      while (docRetries < 3) {
+        try {
+          docResponse = await docAgent.execute(docRequest)
+          if (docResponse.status === "failed") {
+            throw new Error(docResponse.logs.join(", "))
+          }
+          break;
+        } catch (err: any) {
+          docRetries++;
+          if (docRetries >= 3) {
+            throw new Error(`Documentation AI execution failed after 3 attempts: ${err.message}`)
+          }
+          context.logger(`Documentation AI attempt failed: ${err.message}. Retrying in 10s...`, "warn")
+          await new Promise(resolve => setTimeout(resolve, 10000))
+        }
       }
 
       // ==========================================
@@ -640,8 +654,22 @@ export class Orchestrator {
         context
       }
 
-      const deployResponse = await deployAgent.execute(deployRequest)
-      this.publishEvent("agent_executed", { agent: "Deployment", status: deployResponse.status })
+      let deployResponse: any = {};
+      let deployRetries = 0;
+      while (deployRetries < 3) {
+        try {
+          deployResponse = await deployAgent.execute(deployRequest)
+          this.publishEvent("agent_executed", { agent: "Deployment", status: deployResponse.status })
+          break;
+        } catch (err: any) {
+          deployRetries++;
+          if (deployRetries >= 3) {
+            throw new Error(`Deployment AI execution failed after 3 attempts: ${err.message}`)
+          }
+          context.logger(`Deployment AI attempt failed: ${err.message}. Retrying in 10s...`, "warn")
+          await new Promise(resolve => setTimeout(resolve, 10000))
+        }
+      }
 
       if (deployResponse.status === "failed") {
         throw new Error(`Deployment AI execution failed: ${deployResponse.logs.join(", ")}`)
