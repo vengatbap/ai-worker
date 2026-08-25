@@ -9,8 +9,13 @@ export class ModelRouterImpl implements ModelRouter {
 
   constructor() {
     try {
-      const file = path.resolve(__dirname, "profiles.json")
-      this.profiles = JSON.parse(fs.readFileSync(file, "utf-8"))
+      const file1 = path.resolve(process.cwd(), "core/router/profiles.json")
+      if (fs.existsSync(file1)) {
+        this.profiles = JSON.parse(fs.readFileSync(file1, "utf-8"))
+      } else {
+        const file2 = path.resolve(__dirname, "profiles.json")
+        this.profiles = JSON.parse(fs.readFileSync(file2, "utf-8"))
+      }
     } catch {
       this.profiles = {}
     }

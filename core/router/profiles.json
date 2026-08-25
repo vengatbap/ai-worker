@@ -2,14 +2,14 @@
   "research": {
     "preferred": [
       {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
+        "provider": "mistral",
+        "model": "mistral-large-latest"
       }
     ],
     "fallback": [
       {
-        "provider": "openai",
-        "model": "gpt-4o"
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
       }
     ],
     "maxTokens": 32000,
@@ -20,14 +20,32 @@
   "planner": {
     "preferred": [
       {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
+        "provider": "mistral",
+        "model": "mistral-large-latest"
       }
     ],
     "fallback": [
       {
-        "provider": "openai",
-        "model": "gpt-4o"
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
+      }
+    ],
+    "maxTokens": 32000,
+    "temperature": 0.2,
+    "structuredOutput": true,
+    "reasoning": "high"
+  },
+  "planning": {
+    "preferred": [
+      {
+        "provider": "mistral",
+        "model": "mistral-large-latest"
+      }
+    ],
+    "fallback": [
+      {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
       }
     ],
     "maxTokens": 32000,
@@ -38,14 +56,14 @@
   "qa": {
     "preferred": [
       {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
+        "provider": "mistral",
+        "model": "mistral-large-latest"
       }
     ],
     "fallback": [
       {
-        "provider": "openai",
-        "model": "gpt-4o"
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
       }
     ],
     "maxTokens": 16000,
@@ -56,14 +74,14 @@
   "architect": {
     "preferred": [
       {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
+        "provider": "mistral",
+        "model": "mistral-large-latest"
       }
     ],
     "fallback": [
       {
-        "provider": "openai",
-        "model": "gpt-4o"
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
       }
     ],
     "maxTokens": 32000,
@@ -74,14 +92,14 @@
   "developer": {
     "preferred": [
       {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
+        "provider": "mistral",
+        "model": "mistral-large-latest"
       }
     ],
     "fallback": [
       {
-        "provider": "openai",
-        "model": "gpt-4o"
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
       }
     ],
     "maxTokens": 32000,

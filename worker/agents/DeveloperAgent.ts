@@ -217,7 +217,8 @@ export class DeveloperAgent extends BaseAgent {
           fs.mkdirSync(parentDir, { recursive: true })
         }
 
-        fs.writeFileSync(targetPath, file.content)
+        const contentToWrite = typeof file.content === "object" ? JSON.stringify(file.content, null, 2) : file.content;
+        fs.writeFileSync(targetPath, contentToWrite)
         generatedList.push(file.filepath)
         req.context.logger(`Wrote generated code to workspace target file: ${file.filepath}`)
       }
