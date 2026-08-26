@@ -37,8 +37,8 @@ Return JSON ONLY:
     try {
       const response = await this.providerService.callAI(
         prompt,
-        process.env.QA_PROVIDER || "groq",
-        process.env.QA_MODEL || "llama-3.3-70b-versatile",
+        "qa",
+        artifact.metadata?.projectId || "eval-task",
         systemPrompt
       )
 

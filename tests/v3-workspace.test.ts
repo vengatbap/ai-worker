@@ -78,9 +78,9 @@ async function runV3Tests() {
 
   eventBus.publish(liveEvent)
 
-  assert.ok(receivedSSEData !== null, "SSE subscriber should receive published event")
-  assert.ok(receivedSSEData!.includes("qa.scored"), "SSE data should include event type")
-  assert.ok(receivedSSEData!.includes("92"), "SSE data should include payload")
+  assert.ok(typeof receivedSSEData === "string", "SSE subscriber should receive published event")
+  assert.ok((receivedSSEData as string).includes("qa.scored"), "SSE data should include event type")
+  assert.ok((receivedSSEData as string).includes("92"), "SSE data should include payload")
   console.log("   ✅ SSE live streaming delivery passed")
 
   // Verify persistence path

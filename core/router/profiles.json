@@ -4,10 +4,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -18,10 +19,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -32,10 +34,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -46,10 +49,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 16000,
     "temperature": 0.1,
     "structuredOutput": true,
@@ -60,10 +64,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -74,10 +79,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 32000,
     "temperature": 0.1,
     "structuredOutput": true,
@@ -88,10 +94,11 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
-    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 16000,
     "temperature": 0.1,
     "structuredOutput": true,
@@ -102,9 +109,10 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
     "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 16000,
     "temperature": 0.3,
@@ -116,9 +124,10 @@
       { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+      { "provider": "cohere", "model": "command-r-plus" },
+      { "provider": "mistral", "model": "mistral-small-latest" }
     ],
-    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "largeContext": { "provider": "mistral", "model": "mistral-large-latest" },
     "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
     "maxTokens": 8000,
     "temperature": 0.1,
