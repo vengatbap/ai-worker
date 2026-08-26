@@ -1,11 +1,9 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, PlanningArtifact, ExecutionPackageV2 } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
 
 export class TaskAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/planning/v1/system.md
@@ -15,14 +13,12 @@ export class TaskAgent extends BaseAgent {
       : "You are a Project Planning Engine AI."
     
     super("Planning", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route(this.role)
 
-    req.context.logger(`Executing Project Planning Engine using ${provider} / ${model}...`)
+    req.context.logger(`Executing Project Planning Engine (routing handled by ProviderService)...`)
 
     // Load architecture.json (architect artifact)
     const datasetDir = path.resolve(process.cwd(), "dataset", req.projectId)
@@ -50,8 +46,8 @@ export class TaskAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 

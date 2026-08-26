@@ -1,11 +1,9 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, ResearchArtifact } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
 
 export class ResearchAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/research/v1/system.md
@@ -15,14 +13,12 @@ export class ResearchAgent extends BaseAgent {
       : "You are a Research AI."
     
     super("Research", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route(this.role)
 
-    req.context.logger(`Executing Research Agent using ${provider} / ${model}...`)
+    req.context.logger(`Executing Research Agent (routing handled by ProviderService)...`)
 
     // Load user prompt template
     const userPromptPath = path.resolve(process.cwd(), "prompts/research/v1/user.md")
@@ -35,8 +31,8 @@ export class ResearchAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 

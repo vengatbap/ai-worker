@@ -1,11 +1,9 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, PlannerArtifact } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
 
 export class PlannerAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/planner/v1/system.md
@@ -15,14 +13,12 @@ export class PlannerAgent extends BaseAgent {
       : "You are a Planner AI."
     
     super("Planner", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route(this.role)
 
-    req.context.logger(`Executing Planner Agent using ${provider} / ${model}...`)
+    req.context.logger(`Executing Planner Agent (routing handled by ProviderService)...`)
 
     // Load research.json artifact
     const datasetDir = path.resolve(process.cwd(), "dataset", req.projectId)
@@ -50,8 +46,8 @@ export class PlannerAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 

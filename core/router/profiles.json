@@ -1,17 +1,13 @@
 {
   "research": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -19,17 +15,13 @@
   },
   "planner": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "gemini", "model": "gemini-1.5-pro" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -37,17 +29,13 @@
   },
   "planning": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "gemini", "model": "gemini-1.5-pro" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -55,17 +43,13 @@
   },
   "qa": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
     "maxTokens": 16000,
     "temperature": 0.1,
     "structuredOutput": true,
@@ -73,17 +57,13 @@
   },
   "architect": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
     "maxTokens": 32000,
     "temperature": 0.2,
     "structuredOutput": true,
@@ -91,20 +71,58 @@
   },
   "developer": {
     "preferred": [
-      {
-        "provider": "mistral",
-        "model": "mistral-large-latest"
-      }
+      { "provider": "mistral", "model": "mistral-large-latest" }
     ],
     "fallback": [
-      {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-      }
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
     ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
     "maxTokens": 32000,
     "temperature": 0.1,
     "structuredOutput": true,
     "reasoning": "high"
+  },
+  "reviewer": {
+    "preferred": [
+      { "provider": "mistral", "model": "mistral-large-latest" }
+    ],
+    "fallback": [
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+    ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "openai", "model": "gpt-4o" },
+    "maxTokens": 16000,
+    "temperature": 0.1,
+    "structuredOutput": true,
+    "reasoning": "high"
+  },
+  "doc": {
+    "preferred": [
+      { "provider": "mistral", "model": "mistral-large-latest" }
+    ],
+    "fallback": [
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+    ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
+    "maxTokens": 16000,
+    "temperature": 0.3,
+    "structuredOutput": true,
+    "reasoning": "medium"
+  },
+  "deployment": {
+    "preferred": [
+      { "provider": "mistral", "model": "mistral-large-latest" }
+    ],
+    "fallback": [
+      { "provider": "groq", "model": "llama-3.3-70b-versatile" }
+    ],
+    "largeContext": { "provider": "gemini", "model": "gemini-1.5-pro" },
+    "strongReasoning": { "provider": "mistral", "model": "mistral-large-latest" },
+    "maxTokens": 8000,
+    "temperature": 0.1,
+    "structuredOutput": true,
+    "reasoning": "medium"
   }
 }

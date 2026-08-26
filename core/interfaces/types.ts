@@ -528,17 +528,121 @@ export interface WorkspaceService {
 }
 
 
+// ─────────────────────────────────────────────
+// V2.4 Resilient Router Types
+// ─────────────────────────────────────────────
+
+/** All recognized failure categories the Router can classify */
+export type ProviderErrorType =
+  | "RATE_LIMIT"
+  | "TIMEOUT"
+  | "CONTEXT_TOO_LARGE"
+  | "QUALITY_FAILURE"
+  | "PROVIDER_UNAVAILABLE"
+  | "AUTH_ERROR"
+  | "CONTENT_FILTER"
+  | "NETWORK_ERROR"
+  | "INVALID_RESPONSE"
+  | "UNKNOWN";
+
+/** Actions the Router can return for a given failure */
+export type RoutingAction =
+  | "RETRY"
+  | "FALLBACK"
+  | "ESCALATE_CONTEXT"
+  | "ESCALATE_QUALITY"
+  | "ABORT";
+
+/** One routing event emitted per attempt to the EventBus */
+export interface RoutingEvent {
+  routingTraceId: string;
+  agentRole: string;
+  taskId: string;
+  attempt: number;
+  provider: string;
+  model: string;
+  status: "SUCCESS" | ProviderErrorType;
+  errorType?: ProviderErrorType;
+  action?: RoutingAction;
+  /** "provider/model" string of the source before a fallback, e.g. "mistral/mistral-large-latest" */
+  fallbackFrom?: string;
+  /** "provider/model" string of the destination after a fallback */
+  fallbackTo?: string;
+  latencyMs: number;
+  estimatedTokens?: number;
+  estimatedCost?: number;
+  timestamp: string;
+}
+
+/** Hard caps that prevent runaway token spend in a single agent call */
+export interface RoutingBudget {
+  maxAttempts: number;
+  maxFallbacks: number;
+  maxLatencyMs?: number;
+  maxEstimatedCost?: number;
+}
+
+/** Health state of a provider tracked by the Router */
+export interface ProviderHealthState {
+  status: "HEALTHY" | "DEGRADED" | "UNAVAILABLE";
+  failures: number;
+  lastFailureAt?: string;
+  /** ISO timestamp; provider is skipped until this time passes */
+  cooldownUntil?: string;
+}
+
+/**
+ * A routing decision produced by ModelRouter and consumed by ProviderService.
+ * The executor never makes routing decisions — it only acts on these.
+ */
+export interface RoutingDecision {
+  routingTraceId: string;
+  provider: string;
+  model: string;
+  /** Why this decision was made */
+  reason: ProviderErrorType | "INITIAL";
+}
+
 export interface ProviderService {
+  /**
+   * Execute an AI call with automatic retry/fallback handled internally.
+   * Agents must NOT pass provider or model — the Router selects them.
+   */
   callAI(
     prompt: string,
-    provider: string,
-    model: string,
-    systemPrompt?: string
+    agentRole: string,
+    taskId: string,
+    systemPrompt?: string,
+    budget?: RoutingBudget,
+    qualityEscalate?: boolean
   ): Promise<string>;
 }
 
 export interface ModelRouter {
-  route(agentRole: string): { provider: string; model: string };
+  /**
+   * Produce the next routing decision for an agent role.
+   * @param agentRole  Logical role name (e.g. "developer", "planner")
+   * @param hint       Optional context about why we are re-routing
+   */
+  route(
+    agentRole: string,
+    hint?: { reason?: ProviderErrorType | "INITIAL"; fromProvider?: string; fromModel?: string; qualityEscalate?: boolean }
+  ): RoutingDecision;
+
+  /** Classify a raw thrown error into a typed ProviderErrorType */
+  classifyError(error: any): ProviderErrorType;
+
+  /** Return the current health state for a provider */
+  getProviderHealth(provider: string): ProviderHealthState;
+
+  /**
+   * Record a provider failure.  May transition provider to DEGRADED and start cooldown.
+   */
+  markProviderFailure(provider: string, errorType: ProviderErrorType): void;
+
+  /** Return a copy of all routing events emitted this session */
+  getRoutingEvents(): RoutingEvent[];
+
   trackUsage(tokens: number, cost: number): void;
   getMetrics(): { tokenCount: number; costUsd: number };
 }

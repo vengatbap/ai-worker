@@ -9,6 +9,8 @@ export abstract class BaseAgent implements Agent {
   constructor(role: string, systemPrompt: string) {
     this.role = role
     this.systemPrompt = systemPrompt
+    // Each agent gets its own ProviderService (and its own embedded Router).
+    // Health state and routing events are scoped to the agent's lifecycle.
     this.providerService = new ProviderServiceImpl()
   }
 
@@ -19,18 +21,18 @@ export abstract class BaseAgent implements Agent {
   async prepare(req: AgentRequest): Promise<void> {
     req.context.logger(`Preparing agent role: ${this.role}`)
   }
-  
+
   abstract execute(req: AgentRequest): Promise<AgentResponse>;
-  
+
   async evaluate(res: AgentResponse): Promise<boolean> {
     return res.status === "success"
   }
-  
+
   async retry(req: AgentRequest, err: Error): Promise<AgentResponse> {
     req.context.logger(`Retrying agent ${this.role} execution due to failure: ${err.message}`, "warn")
     return this.execute(req)
   }
-  
+
   async finalize(): Promise<void> {
     // Finalizer hook
   }

@@ -1,11 +1,9 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, ReleaseReport, DeploymentArtifact } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
 
 export class DeploymentAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/deployment/v1/system.md
@@ -15,14 +13,12 @@ export class DeploymentAgent extends BaseAgent {
       : "You are a senior Deployment AI."
     
     super("Deployment", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route("QA") // Reuses QA profile router
 
-    req.context.logger(`Executing Deployment AI using ${provider} / ${model}...`)
+    req.context.logger(`Executing Deployment AI (routing handled by ProviderService)...`)
 
     const datasetDir = path.resolve(process.cwd(), "dataset", req.projectId)
     
@@ -41,8 +37,8 @@ export class DeploymentAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 

@@ -1,6 +1,5 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, ExecutionPackageV2 } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import { ScopeMatcher } from "../../core/policy/ScopeMatcher"
 import { ScopePolicyEngine } from "../../core/policy/ScopePolicyEngine"
 import { WorkspaceServiceImpl } from "../../core/workspace/WorkspaceServiceImpl"
@@ -8,7 +7,6 @@ import fs from "fs"
 import path from "path"
 
 export class DeveloperAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/developer/v1/system.md
@@ -18,14 +16,12 @@ export class DeveloperAgent extends BaseAgent {
       : "You are a Developer AI."
     
     super("Developer", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route(this.role)
 
-    req.context.logger(`Executing Developer Agent using ${provider} / ${model}...`)
+    req.context.logger(`Executing Developer Agent (routing handled by ProviderService)...`)
 
     // Load target task execution package
     // Task agent wrote v1.json under: dataset/{projectId}/planning/execution-packages/{taskId}/v1.json
@@ -73,8 +69,8 @@ export class DeveloperAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 

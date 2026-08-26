@@ -1,11 +1,9 @@
 import { BaseAgent } from "./BaseAgent"
 import { AgentRequest, AgentResponse, ReviewReport, ReviewArtifact } from "../../core/interfaces/types"
-import { ModelRouterImpl } from "../../core/router/ModelRouterImpl"
 import fs from "fs"
 import path from "path"
 
 export class ReviewerAgent extends BaseAgent {
-  private modelRouter: ModelRouterImpl
 
   constructor() {
     // Load system prompt from prompts/reviewer/v1/system.md
@@ -15,14 +13,12 @@ export class ReviewerAgent extends BaseAgent {
       : "You are a senior Engineering Governance Engine AI."
     
     super("Reviewer", systemPrompt)
-    this.modelRouter = new ModelRouterImpl()
   }
 
   async execute(req: AgentRequest): Promise<AgentResponse> {
     const startTime = Date.now()
-    const { provider, model } = this.modelRouter.route("QA") // Reuses QA reasoning level router
 
-    req.context.logger(`Executing Reviewer Agent using ${provider} / ${model}...`)
+    req.context.logger(`Executing Reviewer Agent (routing handled by ProviderService)...`)
 
     // Load execution package details to find target writes files
     const datasetDir = path.resolve(process.cwd(), "dataset", req.projectId)
@@ -78,8 +74,8 @@ export class ReviewerAgent extends BaseAgent {
     try {
       const response = await this.providerService.callAI(
         userPrompt,
-        provider,
-        model,
+        this.role,
+        req.taskId,
         this.systemPrompt
       )
 
