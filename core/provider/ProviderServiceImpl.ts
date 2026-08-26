@@ -5,13 +5,21 @@ import {
   ProviderErrorType,
 } from "../interfaces/types"
 import { ModelRouterImpl } from "../router/ModelRouterImpl"
-import { callAI } from "../../worker/ai-service"
+import { callAI as realCallAI } from "../../worker/ai-service"
 
 // Default routing budget — agents can override via callAI options
 const DEFAULT_BUDGET: RoutingBudget = {
   maxAttempts: 4,
   maxFallbacks: 2,
 }
+
+/** Signature matching worker/ai-service callAI for DI */
+type CallAIFn = (
+  prompt: string,
+  provider: string,
+  model: string,
+  systemPrompt?: string
+) => Promise<string | null>
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,8 +31,16 @@ export class ProviderServiceImpl implements ProviderService {
    */
   private router: ModelRouterImpl
 
-  constructor(router?: ModelRouterImpl) {
+  /**
+   * The underlying AI call function.  Defaults to the real callAI from
+   * worker/ai-service.  Pass a controlled function in benchmarks/tests
+   * to simulate provider failures without modifying production code.
+   */
+  private callAIFn: CallAIFn
+
+  constructor(router?: ModelRouterImpl, callAIFn?: CallAIFn) {
     this.router = router ?? new ModelRouterImpl()
+    this.callAIFn = callAIFn ?? realCallAI
   }
 
   /**
@@ -74,7 +90,7 @@ export class ProviderServiceImpl implements ProviderService {
       attempts++
 
       try {
-        const result = await callAI(prompt, provider, model, systemPrompt)
+        const result = await this.callAIFn(prompt, provider, model, systemPrompt)
 
         if (!result) {
           // Empty response — treat as INVALID_RESPONSE
