@@ -83,13 +83,13 @@ export class Orchestrator {
       settings: {},
       logger: (msg, lvl = "info") => {
         console.log(`[${lvl.toUpperCase()}] ${msg}`)
-        this.publishEvent("log_emitted", { projectId, message: msg, level: lvl })
+        this.publishEvent(projectId, "log_emitted", { projectId, message: msg, level: lvl })
       }
     }
 
     const startTime = Date.now()
     context.logger("Starting SaaS Builder AI v4 Orchestrator Pipeline...")
-    this.publishEvent("workflow_started", { projectId, taskName, prompt })
+    this.publishEvent(projectId, "workflow_started", { projectId, taskName, prompt })
 
     try {
       const agentRequest: AgentRequest = {
@@ -112,9 +112,10 @@ export class Orchestrator {
       let researchRetries = 0
       const maxRetries = 3
 
+      this.publishEvent(projectId, "agent.started", { agentRole: "Research" })
       while (researchRetries < maxRetries) {
         researchResponse = await researchAgent.execute(agentRequest)
-        this.publishEvent("agent_executed", { agent: "Research", status: researchResponse.status, retryCount: researchRetries })
+        this.publishEvent(projectId, "agent_executed", { agent: "Research", status: researchResponse.status, retryCount: researchRetries })
 
         if (researchResponse.status === "failed") {
           researchRetries++
@@ -142,7 +143,7 @@ export class Orchestrator {
           "The artifact must contain Executive Summary, Competitors Analysis, and Tech Recommendations. Minimum quality score must be greater than 85."
         )
 
-        this.publishEvent("metrics_recorded", {
+        this.publishEvent(projectId, "metrics_recorded", {
           agent: "Research",
           model: this.modelRouter.route("Research").model,
           provider: this.modelRouter.route("Research").provider,
@@ -163,6 +164,7 @@ export class Orchestrator {
 
         context.logger(`Research Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "research", draftArtifact.version, "Approved")
+        this.publishEvent(projectId, "agent.completed", { agentRole: "Research", status: "success" })
         break
       }
 
@@ -180,9 +182,10 @@ export class Orchestrator {
       let plannerResponse: AgentResponse | null = null
       let plannerRetries = 0
 
+      this.publishEvent(projectId, "agent.started", { agentRole: "Planner" })
       while (plannerRetries < maxRetries) {
         plannerResponse = await plannerAgent.execute(agentRequest)
-        this.publishEvent("agent_executed", { agent: "Planner", status: plannerResponse.status, retryCount: plannerRetries })
+        this.publishEvent(projectId, "agent_executed", { agent: "Planner", status: plannerResponse.status, retryCount: plannerRetries })
 
         if (plannerResponse.status === "failed") {
           plannerRetries++
@@ -210,7 +213,7 @@ export class Orchestrator {
           "The artifact must contain functional requirements list, MVP scope detail, roadmap phases, and milestone definitions. Minimum quality score must be greater than 90."
         )
 
-        this.publishEvent("metrics_recorded", {
+        this.publishEvent(projectId, "metrics_recorded", {
           agent: "Planner",
           model: this.modelRouter.route("Planner").model,
           provider: this.modelRouter.route("Planner").provider,
@@ -231,6 +234,7 @@ export class Orchestrator {
 
         context.logger(`Planner Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "planner", draftArtifact.version, "Approved")
+        this.publishEvent(projectId, "agent.completed", { agentRole: "Planner", status: "success" })
         break
       }
 
@@ -248,9 +252,10 @@ export class Orchestrator {
       let archResponse: AgentResponse | null = null
       let archRetries = 0
 
+      this.publishEvent(projectId, "agent.started", { agentRole: "Architect" })
       while (archRetries < maxRetries) {
         archResponse = await architectAgent.execute(agentRequest)
-        this.publishEvent("agent_executed", { agent: "Architect", status: archResponse.status, retryCount: archRetries })
+        this.publishEvent(projectId, "agent_executed", { agent: "Architect", status: archResponse.status, retryCount: archRetries })
 
         if (archResponse.status === "failed") {
           archRetries++
@@ -278,7 +283,7 @@ export class Orchestrator {
           "The artifact must contain folderTree definition, tables database schema design, and dependencyGraph connections list. Minimum quality score must be greater than 85."
         )
 
-        this.publishEvent("metrics_recorded", {
+        this.publishEvent(projectId, "metrics_recorded", {
           agent: "Architect",
           model: this.modelRouter.route("Architect").model,
           provider: this.modelRouter.route("Architect").provider,
@@ -299,6 +304,7 @@ export class Orchestrator {
 
         context.logger(`Architect Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "architecture", draftArtifact.version, "Approved")
+        this.publishEvent(projectId, "agent.completed", { agentRole: "Architect", status: "success" })
         break
       }
 
@@ -316,9 +322,10 @@ export class Orchestrator {
       let taskResponse: AgentResponse | null = null
       let taskRetries = 0
 
+      this.publishEvent(projectId, "agent.started", { agentRole: "Planning" })
       while (taskRetries < maxRetries) {
         taskResponse = await taskAgent.execute(agentRequest)
-        this.publishEvent("agent_executed", { agent: "PlanningEngine", status: taskResponse.status, retryCount: taskRetries })
+        this.publishEvent(projectId, "agent_executed", { agent: "PlanningEngine", status: taskResponse.status, retryCount: taskRetries })
 
         if (taskResponse.status === "failed") {
           taskRetries++
@@ -354,7 +361,7 @@ export class Orchestrator {
           "The artifact must contain structured epics list, task execution orders, and dependency criteria. Minimum quality score must be greater than 85."
         )
 
-        this.publishEvent("metrics_recorded", {
+        this.publishEvent(projectId, "metrics_recorded", {
           agent: "PlanningEngine",
           model: this.modelRouter.route("Planning").model,
           provider: this.modelRouter.route("Planning").provider,
@@ -375,6 +382,7 @@ export class Orchestrator {
 
         context.logger(`Planning Engine Quality Check passed! Score: ${evalResult.score}`)
         await this.artifactService.updateArtifactStatus(projectId, "planning", draftArtifact.version, "Approved")
+        this.publishEvent(projectId, "agent.completed", { agentRole: "Planning", status: "success" })
         break
       }
 
@@ -456,6 +464,7 @@ export class Orchestrator {
           }
         }
 
+        this.publishEvent(projectId, "agent.started", { agentRole: "Developer" })
         while (devRetries < devMaxRetries && !governancePassed) {
           context.logger(`Developer AI Attempt ${devRetries + 1}...`)
           devRequest.context.variables.feedbackLogs = feedbackLogs
@@ -474,6 +483,8 @@ export class Orchestrator {
             continue
           }
 
+          this.publishEvent(projectId, "agent.completed", { agentRole: "Developer", status: "success" })
+
           context.logger("Running QA Engine validation checks...")
           const qaRequest: AgentRequest = {
             id: `req-${projectId}-qa-${targetTask.id}`,
@@ -484,6 +495,7 @@ export class Orchestrator {
             context
           }
 
+          this.publishEvent(projectId, "agent.started", { agentRole: "QA" })
           await this.workspaceService.updateWorkspaceState(projectId, "VALIDATING")
           const qaResponse = await qaAgent.execute(qaRequest)
 
@@ -503,6 +515,9 @@ export class Orchestrator {
           const qaScoreContent = fs.readFileSync(qaReportPath, "utf-8")
           const qaScoreData = JSON.parse(qaScoreContent)
           const overallScore = qaScoreData.overallScore || 0
+
+          this.publishEvent(projectId, "agent.completed", { agentRole: "QA", status: "success" })
+          this.publishEvent(projectId, "qa.scored", { taskId: targetTask.id, score: overallScore })
 
           if (overallScore < 85) {
             devRetries++
@@ -527,6 +542,7 @@ export class Orchestrator {
             context
           }
 
+          this.publishEvent(projectId, "agent.started", { agentRole: "Reviewer" })
           const reviewResponse = await reviewerAgent.execute(reviewerRequest)
 
           if (reviewResponse.status === "failed") {
@@ -544,6 +560,9 @@ export class Orchestrator {
           const approvalPath = path.join(datasetDir, "review/approval.json")
           const approvalContent = fs.readFileSync(approvalPath, "utf-8")
           const approvalData = JSON.parse(approvalContent)
+
+          this.publishEvent(projectId, "agent.completed", { agentRole: "Reviewer", status: "success" })
+          this.publishEvent(projectId, "reviewer.decision", { taskId: targetTask.id, decision: approvalData.decision })
 
           if (approvalData.decision !== "APPROVED") {
             devRetries++
@@ -608,6 +627,7 @@ export class Orchestrator {
       // ==========================================
       context.logger("Executing Documentation AI (DocAgent)...")
       updateTaskStatus(projectId, "processing", { report: "Running Documentation AI..." })
+      this.publishEvent(projectId, "agent.started", { agentRole: "Documentation" })
 
       const docAgent = new DocAgent()
       const docRequest: AgentRequest = {
@@ -627,10 +647,12 @@ export class Orchestrator {
           if (docResponse.status === "failed") {
             throw new Error(docResponse.logs.join(", "))
           }
+          this.publishEvent(projectId, "agent.completed", { agentRole: "Documentation", status: "success" })
           break;
         } catch (err: any) {
           docRetries++;
           if (docRetries >= 3) {
+            this.publishEvent(projectId, "agent.failed", { agentRole: "Documentation", error: err.message })
             throw new Error(`Documentation AI execution failed after 3 attempts: ${err.message}`)
           }
           context.logger(`Documentation AI attempt failed: ${err.message}. Retrying in 10s...`, "warn")
@@ -643,6 +665,7 @@ export class Orchestrator {
       // ==========================================
       context.logger("Executing Deployment AI (DeploymentAgent)...")
       updateTaskStatus(projectId, "processing", { report: "Running Deployment AI..." })
+      this.publishEvent(projectId, "agent.started", { agentRole: "Deployment" })
 
       const deployAgent = new DeploymentAgent()
       const deployRequest: AgentRequest = {
@@ -659,11 +682,12 @@ export class Orchestrator {
       while (deployRetries < 3) {
         try {
           deployResponse = await deployAgent.execute(deployRequest)
-          this.publishEvent("agent_executed", { agent: "Deployment", status: deployResponse.status })
+          this.publishEvent(projectId, "agent.completed", { agentRole: "Deployment", status: "success" })
           break;
         } catch (err: any) {
           deployRetries++;
           if (deployRetries >= 3) {
+            this.publishEvent(projectId, "agent.failed", { agentRole: "Deployment", error: err.message })
             throw new Error(`Deployment AI execution failed after 3 attempts: ${err.message}`)
           }
           context.logger(`Deployment AI attempt failed: ${err.message}. Retrying in 10s...`, "warn")
@@ -743,7 +767,7 @@ export class Orchestrator {
       context.logger("ProjectManifest.json Kernel saved successfully.")
 
       const totalDuration = Date.now() - startTime
-      this.publishEvent("workflow_completed", { projectId, durationMs: totalDuration })
+      this.publishEvent(projectId, "pipeline.done", { projectId, status: "success", durationMs: totalDuration })
 
       return {
         status: "success",
@@ -767,7 +791,7 @@ export class Orchestrator {
 
     } catch (err: any) {
       context.logger(`Workflow pipeline crashed: ${err.message}`, "error")
-      this.publishEvent("workflow_failed", { projectId, error: err.message })
+      this.publishEvent(projectId, "pipeline.done", { projectId, status: "failed", error: err.message })
       throw err
     }
   }
@@ -805,10 +829,16 @@ export class Orchestrator {
     }
   }
 
-  private publishEvent(type: string, payload: any) {
+  /**
+   * Emit a structured event to the EventBus.
+   * projectId is always included so TelemetryStore can scope it and SSE
+   * can fan-out to the correct browser connection.
+   */
+  private publishEvent(projectId: string, type: string, payload: any) {
     this.eventBus.publish({
-      id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       type,
+      projectId,
       timestamp: new Date().toISOString(),
       payload
     })

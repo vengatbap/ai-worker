@@ -679,12 +679,16 @@ export interface AppEvent {
   id: string;
   type: string;
   timestamp: string;
+  /** projectId is required for TelemetryStore scoping and SSE fan-out */
+  projectId?: string;
   payload: any;
 }
 
 export interface EventBus {
   publish(event: AppEvent): void;
   subscribe(eventType: string, handler: (event: AppEvent) => void): void;
+  /** Register an SSE response writer for a project. Returns an unsubscribe fn. */
+  subscribeSSE(projectId: string, writer: (data: string) => void): () => void;
 }
 
 export interface LearningService {
