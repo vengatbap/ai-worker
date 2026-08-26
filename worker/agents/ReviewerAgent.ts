@@ -70,6 +70,8 @@ export class ReviewerAgent extends BaseAgent {
       : "Please review generated files: ${generatedFiles} against architecture: ${architectureJson} and standards: ${companyStandards}"
     
     userPrompt = userPrompt.replace("${generatedFiles}", JSON.stringify(filesData, null, 2))
+    userPrompt = userPrompt.replace("${taskTitle}", executionPackage.title || req.taskId)
+    userPrompt = userPrompt.replace("${acceptanceCriteria}", (executionPackage.acceptanceCriteria || []).map((c: string) => `- ${c}`).join("\n"))
     userPrompt = userPrompt.replace("${architectureJson}", archJson)
     userPrompt = userPrompt.replace("${companyStandards}", standards)
 

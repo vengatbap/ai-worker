@@ -106,7 +106,9 @@ export class DocAgent extends BaseAgent {
       // Write individual generated documentation Markdown files
       const docsTree = parsedData.documentTree || {}
       for (const [filename, markdownContent] of Object.entries(docsTree)) {
-        fs.writeFileSync(path.join(docDir, filename), markdownContent as string)
+        const fullFilePath = path.join(docDir, filename)
+        fs.mkdirSync(path.dirname(fullFilePath), { recursive: true })
+        fs.writeFileSync(fullFilePath, markdownContent as string)
         req.context.logger(`Published document: ${filename}`)
       }
 
