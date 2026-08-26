@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { saveTask, updateTaskStatus } from '@/lib/db'
 import { Orchestrator } from '../../../../worker/orchestrator'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   try {
     const { taskContent, taskName } = await req.json()

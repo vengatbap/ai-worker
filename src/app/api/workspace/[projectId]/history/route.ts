@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { EventBusImpl } from "../../../../../../core/events/EventBusImpl"
 
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/workspace/[projectId]/history
  *

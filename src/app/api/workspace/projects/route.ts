@@ -4,6 +4,8 @@ import { AppEvent } from "../../../../../core/interfaces/types"
 import fs from "fs"
 import path from "path"
 
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/workspace/projects
  *

@@ -4,6 +4,8 @@ import { saveTask } from '@/lib/db'
 import fs from 'fs'
 import path from 'path'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   try {
     const { productIdea } = await req.json()

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { Orchestrator } from "../../../../../worker/orchestrator"
 
+export const dynamic = "force-dynamic"
+
 /**
  * POST /api/workspace/run
  *
